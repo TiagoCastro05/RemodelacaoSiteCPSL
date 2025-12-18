@@ -1,10 +1,22 @@
 import React from "react";
+import Header from "../components/Header";
 import "../styles/Home.css";
 
 const Home = () => {
+  // Definir as secções do site
+  const sections = [
+    { id: "instituicao", label: "Instituição" },
+    { id: "projetos", label: "Projetos" },
+    { id: "respostas-sociais", label: "Respostas Sociais" },
+    { id: "noticias", label: "Notícias" },
+    { id: "contactos", label: "Contactos" },
+  ];
+
   return (
     <div className="home-page">
-      <header className="hero-section">
+      <Header sections={sections} />
+
+      <section className="hero-section">
         <div className="container">
           <h1>Centro Paroquial e Social de Lanheses</h1>
           <p>
@@ -14,7 +26,7 @@ const Home = () => {
             Entre em Contacto
           </a>
         </div>
-      </header>
+      </section>
 
       <section id="instituicao" className="section">
         <div className="container">

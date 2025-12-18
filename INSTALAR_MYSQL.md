@@ -1,125 +1,228 @@
-# 📥 Como Instalar o MySQL no Windows
+# 📦 GUIA DE INSTALAÇÃO DO MySQL
 
-## Opção 1: MySQL Community Server (Recomendado)
+## 🎯 O que precisa fazer
 
-### 1. Download
-1. Ir para: https://dev.mysql.com/downloads/mysql/
-2. Escolher: **Windows (x86, 64-bit), MSI Installer**
-3. Download do ficheiro (aprox. 300MB)
-
-### 2. Instalação
-1. Executar o instalador `.msi`
-2. Escolher: **Developer Default** ou **Server only**
-3. Clicar "Next" até chegar à configuração do servidor
-
-### 3. Configuração Importante
-- **Type and Networking**: Deixar padrão (Port 3306)
-- **Authentication Method**: Escolher "Use Strong Password Encryption"
-- **Root Password**: Definir password (ex: `root` ou `admin123`)
-  - ⚠️ **ANOTAR ESTA PASSWORD!**
-- **Windows Service**: Marcar "Start MySQL Server at System Startup"
-
-### 4. Finalizar
-- Clicar "Execute" para aplicar configuração
-- Clicar "Finish"
-
-### 5. Verificar Instalação
-Abrir PowerShell e executar:
-```powershell
-mysql --version
-```
-
-Deve ver algo como: `mysql Ver 8.0.x`
+Para o site funcionar, precisa instalar o MySQL Server no seu computador.
 
 ---
 
-## Opção 2: XAMPP (Mais Simples)
+## 📥 Método 1: Instalação Rápida (Recomendado)
 
-### 1. Download
-- Ir para: https://www.apachefriends.org/
-- Download XAMPP para Windows
+### Passo 1: Baixar o MySQL Installer
 
-### 2. Instalação
-1. Executar instalador
-2. Selecionar componentes:
-   - ✅ Apache
-   - ✅ MySQL
-   - ✅ PHP
-   - ✅ phpMyAdmin
+1. Vá para: https://dev.mysql.com/downloads/installer/
+2. Escolha: **"Windows (x86, 32-bit), MSI Installer"** (mysql-installer-community)
+3. Tamanho do ficheiro: ~400MB
+4. Clique em **"Download"**
+5. Pode clicar em **"No thanks, just start my download"** (não precisa criar conta)
 
-### 3. Iniciar MySQL
-1. Abrir XAMPP Control Panel
-2. Clicar "Start" no MySQL
-3. O MySQL estará na porta 3306
+### Passo 2: Executar o Instalador
 
-### 4. Configurar Password
-No XAMPP, por padrão:
-- Username: `root`
-- Password: *(vazia)*
+1. Abra o ficheiro `.msi` descarregado
+2. Escolha o tipo de instalação: **"Developer Default"** ✅
+   - Isto instala o MySQL Server + MySQL Workbench + ferramentas úteis
 
-Se quiser definir password:
+### Passo 3: Configuração do MySQL Server
+
+Durante a instalação, será pedido para configurar:
+
+#### 3.1 Tipo e Rede
+
+- **Config Type**: Development Computer ✅
+- **Port**: 3306 (deixar padrão) ✅
+- **X Protocol Port**: 33060 (deixar padrão) ✅
+
+#### 3.2 Autenticação
+
+- Escolher: **"Use Strong Password Encryption"** ✅
+
+#### 3.3 Accounts and Roles
+
+- **Root Password**: Criar uma password forte e **GUARDAR BEM** ⚠️
+  - Exemplo: `MySQLRoot2025!`
+- Pode adicionar outros utilizadores (opcional)
+
+#### 3.4 Windows Service
+
+- ✅ Configure MySQL Server as a Windows Service
+- ✅ Start the MySQL Server at System Startup
+- Service Name: `MySQL80` (deixar padrão)
+
+### Passo 4: Completar Instalação
+
+1. Clique em **"Execute"** para aplicar a configuração
+2. Aguarde até todos os passos ficarem verdes ✅
+3. Clique em **"Finish"**
+
+---
+
+## 🔧 Método 2: Instalação via Winget (Rápido mas menos opções)
+
+Se tiver o Windows 11 ou Windows 10 atualizado:
+
 ```powershell
-cd C:\xampp\mysql\bin
-.\mysqladmin -u root password nova_password
+# No PowerShell como Administrador
+winget install Oracle.MySQL
+```
+
+⚠️ **Nota:** Este método instala apenas o servidor, sem o Workbench.
+
+---
+
+## ✅ Verificar Instalação
+
+### 1. Verificar se o serviço está a correr
+
+Abra o PowerShell e execute:
+
+```powershell
+Get-Service -Name "MySQL*"
+```
+
+Deve aparecer algo como:
+
+```
+Status   Name               DisplayName
+------   ----               -----------
+Running  MySQL80            MySQL80
+```
+
+### 2. Testar conexão via linha de comandos
+
+```powershell
+mysql -u root -p
+```
+
+Digite a password que criou. Se entrar no MySQL, está tudo OK! ✅
+
+Para sair do MySQL:
+
+```sql
+exit;
 ```
 
 ---
 
-## 📝 Depois da Instalação
+## 🗄️ Criar a Base de Dados do Projeto
 
-### 1. Atualizar `.env`
-Editar o ficheiro `.env` na raiz do projeto:
+### Opção A: MySQL Workbench (Recomendado - Interface Gráfica)
+
+1. Abra o **MySQL Workbench**
+2. Clique na conexão **"Local instance MySQL80"**
+3. Digite a password do root
+4. No menu: **File > Open SQL Script**
+5. Navegue até: `C:\ECGM\PROJETO\RemodelacaoCPSL\database\schema.sql`
+6. Clique no ícone do **raio** (⚡) para executar
+7. Aguarde até ver "Action Output" com mensagens de sucesso
+
+### Opção B: Linha de Comandos
+
+```powershell
+# Na pasta do projeto
+cd C:\ECGM\PROJETO\RemodelacaoCPSL
+
+# Executar o schema SQL
+mysql -u root -p < database/schema.sql
+```
+
+Digite a password quando solicitado.
+
+---
+
+## ⚙️ Configurar o Projeto
+
+### 1. Editar o ficheiro `.env`
+
+Na raiz do projeto `C:\ECGM\PROJETO\RemodelacaoCPSL\.env`:
+
 ```env
-DB_PASSWORD=sua_password_aqui
+# Base de Dados MySQL
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=SUA_PASSWORD_MYSQL_AQUI  ← ALTERAR AQUI!
+DB_NAME=cpsl_db
+DB_PORT=3306
 ```
 
-### 2. Criar a Base de Dados
+⚠️ **IMPORTANTE:** Substitua `SUA_PASSWORD_MYSQL_AQUI` pela password que criou na instalação!
+
+### 2. Iniciar o Servidor
+
 ```powershell
-# Se instalou MySQL Community
-mysql -u root -p < database\schema.sql
-
-# Se instalou XAMPP
-C:\xampp\mysql\bin\mysql -u root -p < database\schema.sql
+npm run server
 ```
 
-### 3. Iniciar o Projeto
+Deve aparecer:
+
+```
+✅ Conexão à base de dados MySQL estabelecida com sucesso!
+🚀 Servidor a correr na porta 5000
+```
+
+---
+
+## 🔐 Credenciais de Login do Site
+
+Depois de executar o `schema.sql`, o utilizador admin é criado automaticamente:
+
+```
+URL: http://localhost:3000/admin
+Email: admin@cpslanheses.pt
+Password: Admin123!
+```
+
+---
+
+## 🆘 Problemas Comuns
+
+### ❌ "Access denied for user 'root'@'localhost'"
+
+**Solução:** Verifique se a password no `.env` está correta
+
+### ❌ "Can't connect to MySQL server on 'localhost'"
+
+**Solução:** Verifique se o serviço MySQL está a correr:
+
 ```powershell
-npm run server    # Backend
-cd client
-npm start         # Frontend
+Start-Service -Name "MySQL80"
 ```
 
----
+### ❌ "Unknown database 'cpsl_db'"
 
-## ❓ Troubleshooting
+**Solução:** Execute o ficheiro `schema.sql` para criar a base de dados
 
-### MySQL não inicia
-- **Windows Services**: Verificar se o serviço "MySQL80" está a correr
-- Abrir "Serviços" (services.msc) e procurar por MySQL
+### ❌ Esqueci a password do root do MySQL
 
-### Esqueci a password do root
-- Ver guia oficial: https://dev.mysql.com/doc/refman/8.0/en/resetting-permissions.html
+**Solução:** Precisa resetar a password do MySQL:
 
-### Porta 3306 ocupada
-- Verificar se outro MySQL está a correr
-- Alterar porta no `.env` e no MySQL
+1. Pare o serviço MySQL
+2. Inicie em modo seguro
+3. Reset da password
+4. Reinicie o serviço
 
----
-
-## 🎯 Resumo Rápido
-
-**Opção Fácil (XAMPP):**
-1. Instalar XAMPP
-2. Iniciar MySQL no Control Panel
-3. Password é vazia por padrão
-4. Alterar `.env`: `DB_PASSWORD=` (deixar vazio)
-
-**Opção Completa (MySQL Server):**
-1. Instalar MySQL Community Server
-2. Definir password durante instalação
-3. Alterar `.env` com a password escolhida
-4. MySQL inicia automaticamente
+Tutorial: https://dev.mysql.com/doc/refman/8.0/en/resetting-permissions.html
 
 ---
 
-📚 **Próximo passo**: Depois de instalar, voltar ao projeto e executar `npm run server`
+## 📚 Links Úteis
+
+- MySQL Downloads: https://dev.mysql.com/downloads/installer/
+- MySQL Documentation: https://dev.mysql.com/doc/
+- MySQL Workbench Manual: https://dev.mysql.com/doc/workbench/en/
+
+---
+
+## 📋 Checklist de Instalação
+
+- [ ] MySQL Server instalado
+- [ ] MySQL Workbench instalado (opcional mas recomendado)
+- [ ] Password do root configurada e guardada
+- [ ] Serviço MySQL a correr
+- [ ] Base de dados `cpsl_db` criada (executar `schema.sql`)
+- [ ] Password configurada no `.env`
+- [ ] Servidor backend a funcionar sem erros
+- [ ] Consegue fazer login com admin@cpslanheses.pt
+
+---
+
+🎉 Depois de completar estes passos, o site estará completamente funcional!
