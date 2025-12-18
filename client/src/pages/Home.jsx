@@ -1,8 +1,12 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Header from "../components/Header";
+import api from "../services/api";
 import "../styles/Home.css";
 
 const Home = () => {
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
   // Definir as secções do site
   const sections = [
     { id: "instituicao", label: "Instituição" },
@@ -11,6 +15,27 @@ const Home = () => {
     { id: "noticias", label: "Notícias" },
     { id: "contactos", label: "Contactos" },
   ];
+
+  // Buscar projetos da API
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setLoadingProjects(true);
+        const response = await api.get("/projetos");
+        // Filtrar apenas projetos ativos
+        const activeProjects = (response.data.data || []).filter(
+          (project) => project.ativo
+        );
+        setProjects(activeProjects);
+      } catch (error) {
+        console.error("Erro ao carregar projetos:", error);
+      } finally {
+        setLoadingProjects(false);
+      }
+    };
+
+    fetchProjects();
+  }, []);
 
   return (
     <div className="home-page">
@@ -41,7 +66,73 @@ const Home = () => {
       <section id="projetos" className="section">
         <div className="container">
           <h2>Projetos</h2>
-          <p>Conheça os nossos projetos em curso.</p>
+          <p className="section-intro">Conheça os nossos projetos em curso.</p>
+
+          {loadingProjects ? (
+            <div className="loading-projects">A carregar projetos...</div>
+          ) : projects.length === 0 ? (
+            <p className="no-projects">Nenhum projeto disponível no momento.</p>
+          ) : (
+            <div className="projects-list">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  className={`project-item ${
+                    project.url_externa ? "clickable" : ""
+                  }`}
+                  onClick={() => {
+                    if (project.url_externa) {
+                      window.open(project.url_externa, "_blank");
+                    }
+                  }}
+                  style={{
+                    cursor: project.url_externa ? "pointer" : "default",
+                  }}
+                >
+                  <div className="project-image-container">
+                    {project.imagem_destaque ? (
+                      <img
+                        src={project.imagem_destaque}
+                        alt={project.titulo}
+                        className="project-image"
+                        onError={(e) => {
+                          e.target.src =
+                            "https://via.placeholder.com/800x400?text=Projeto";
+                        }}
+                      />
+                    ) : (
+                      <div className="project-placeholder">
+                        <span>📁 {project.titulo}</span>
+                      </div>
+                    )}
+                    {project.url_externa && (
+                      <div className="project-link-overlay">
+                        <span>🔗 Clique para saber mais</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="project-info">
+                    <h3>
+                      {project.titulo}
+                      {project.url_externa && (
+                        <span className="link-icon">🔗</span>
+                      )}
+                    </h3>
+                    <p className="project-description">{project.descricao}</p>
+                    {project.data_inicio && (
+                      <p className="project-date">
+                        🗓️ Início:{" "}
+                        {new Date(project.data_inicio).toLocaleDateString(
+                          "pt-PT"
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

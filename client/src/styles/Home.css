@@ -42,8 +42,14 @@
 }
 
 .section {
-  padding: 80px 20px;
+  padding: 60px 20px;
   scroll-margin-top: 80px;
+  min-height: auto;
+}
+
+.section .container {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .section h2 {
@@ -56,6 +62,159 @@
   color: var(--text-secondary);
   max-width: 800px;
   margin: 0 auto 32px;
+}
+
+.section-intro {
+  text-align: center;
+  color: var(--text-secondary);
+  max-width: 800px;
+  margin: 0 auto 40px;
+}
+
+/* Projetos */
+.loading-projects,
+.no-projects {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.project-item {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.project-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.project-item.clickable {
+  cursor: pointer;
+}
+
+.project-item.clickable:hover {
+  box-shadow: 0 12px 40px rgba(52, 152, 219, 0.3);
+}
+
+.project-image-container {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  height: 180px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.project-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.project-item:hover .project-image {
+  transform: scale(1.05);
+}
+
+.project-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.project-link-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(52, 152, 219, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.project-item.clickable:hover .project-link-overlay {
+  opacity: 1;
+}
+
+.project-link-overlay span {
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding: 1rem 2rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50px;
+}
+
+.project-info {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.project-info h3 {
+  font-size: 1.5rem;
+  color: #2c3e50;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.link-icon {
+  font-size: 1.5rem;
+  opacity: 0.7;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.project-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #495057;
+  margin: 0 0 0.75rem 0;
+  text-align: center;
+}
+
+.project-date {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin: 0;
+  text-align: center;
 }
 
 .contact-info {
@@ -96,5 +255,30 @@
 
   .section {
     padding: 60px 20px;
+  }
+
+  .projects-list {
+    gap: 2rem;
+  }
+
+  .project-image-container {
+    height: 250px;
+  }
+
+  .project-info {
+    padding: 1.5rem;
+  }
+
+  .project-info h3 {
+    font-size: 1.5rem;
+  }
+
+  .project-description {
+    font-size: 1rem;
+  }
+
+  .project-link-overlay span {
+    font-size: 1.2rem;
+    padding: 0.75rem 1.5rem;
   }
 }
