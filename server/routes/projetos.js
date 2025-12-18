@@ -100,19 +100,21 @@ router.post(
         data_inicio,
         data_fim,
         imagem_destaque,
+        url_externa,
         ativo,
         ordem,
       } = req.body;
 
       const [result] = await pool.query(
-        `INSERT INTO Projetos (titulo, descricao, data_inicio, data_fim, imagem_destaque, ativo, ordem, criado_por) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO Projetos (titulo, descricao, data_inicio, data_fim, imagem_destaque, url_externa, ativo, ordem, criado_por) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           titulo,
           descricao,
           data_inicio,
           data_fim || null,
           imagem_destaque || null,
+          url_externa || null,
           ativo ?? true,
           ordem || 0,
           req.user.id,
@@ -149,6 +151,7 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       data_inicio,
       data_fim,
       imagem_destaque,
+      url_externa,
       ativo,
       ordem,
     } = req.body;
@@ -187,6 +190,10 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     if (imagem_destaque !== undefined) {
       updates.push("imagem_destaque = ?");
       values.push(imagem_destaque || null);
+    }
+    if (url_externa !== undefined) {
+      updates.push("url_externa = ?");
+      values.push(url_externa || null);
     }
     if (typeof ativo !== "undefined") {
       updates.push("ativo = ?");

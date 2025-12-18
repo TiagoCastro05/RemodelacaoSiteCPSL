@@ -2,6 +2,8 @@ import React, { useContext } from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import Users from "./Users";
+import ProjectsManagement from "./ProjectsManagement";
+import ContentManagement from "./ContentManagement";
 import "../styles/Dashboard.css";
 
 const Dashboard = () => {
@@ -43,24 +45,8 @@ const Dashboard = () => {
         <div className="dashboard-content">
           <Routes>
             <Route path="/" element={<DashboardHome />} />
-            <Route
-              path="/conteudo"
-              element={
-                <div>
-                  <h2>Conteúdo Institucional</h2>
-                  <p>Em construção...</p>
-                </div>
-              }
-            />
-            <Route
-              path="/projetos"
-              element={
-                <div>
-                  <h2>Gestão de Projetos</h2>
-                  <p>Em construção...</p>
-                </div>
-              }
-            />
+            <Route path="/conteudo" element={<ContentManagement />} />
+            <Route path="/projetos" element={<ProjectsManagement />} />
             <Route
               path="/noticias"
               element={
