@@ -7,8 +7,8 @@ const { authenticate, isAdminOrGestor } = require("../middleware/auth");
 router.get("/", async (req, res) => {
   try {
     const isAuthenticated = req.headers.authorization;
-    let query = "SELECT * FROM Respostas_Sociais";
-    if (!isAuthenticated) query += " WHERE ativo = TRUE";
+    let query = "SELECT * FROM respostas_sociais";
+    if (!isAuthenticated) query += " WHERE ativo = true";
     query += " ORDER BY ordem ASC";
 
     const [respostas] = await pool.query(query);
@@ -22,7 +22,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const [respostas] = await pool.query(
-      "SELECT * FROM Respostas_Sociais WHERE id = ?",
+      "SELECT * FROM respostas_sociais WHERE id = $1",
       [req.params.id]
     );
     if (respostas.length === 0) {
@@ -32,8 +32,8 @@ router.get("/:id", async (req, res) => {
     }
 
     const [media] = await pool.query(
-      "SELECT * FROM Media WHERE tabela_referencia = ? AND id_referencia = ? ORDER BY ordem ASC",
-      ["Respostas_Sociais", req.params.id]
+      "SELECT * FROM media WHERE tabela_referencia = $1 AND id_referencia = $2 ORDER BY ordem ASC",
+      ["respostas_sociais", req.params.id]
     );
 
     res.json({ success: true, data: { ...respostas[0], media } });
@@ -59,8 +59,8 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
     } = req.body;
 
     const [result] = await pool.query(
-      `INSERT INTO Respostas_Sociais (titulo, subtitulo, descricao, objetivos, servicos_prestados, capacidade, horario, imagem_destaque, ativo, ordem, criado_por) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO respostas_sociais (titulo, subtitulo, descricao, objetivos, servicos_prestados, capacidade, horario, imagem_destaque, ativo, ordem, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [
         titulo,
         subtitulo || null,
@@ -76,13 +76,11 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       ]
     );
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Resposta social criada com sucesso.",
-        data: { id: result.insertId },
-      });
+    res.status(201).json({
+      success: true,
+      message: "Resposta social criada com sucesso.",
+      data: { id: result[0].id },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: "Erro no servidor." });
   }
@@ -105,10 +103,11 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     ];
     const updates = [];
     const values = [];
+    let paramIndex = 1;
 
     fields.forEach((field) => {
       if (req.body[field] !== undefined) {
-        updates.push(`${field} = ?`);
+        updates.push(`${field} = $${paramIndex++}`);
         values.push(req.body[field]);
       }
     });
@@ -121,7 +120,9 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     values.push(req.params.id);
     await pool.query(
-      `UPDATE Respostas_Sociais SET ${updates.join(", ")} WHERE id = ?`,
+      `UPDATE respostas_sociais SET ${updates.join(
+        ", "
+      )} WHERE id = $${paramIndex}`,
       values
     );
 
@@ -138,10 +139,10 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
     await pool.query(
-      "DELETE FROM Media WHERE tabela_referencia = ? AND id_referencia = ?",
-      ["Respostas_Sociais", req.params.id]
+      "DELETE FROM media WHERE tabela_referencia = $1 AND id_referencia = $2",
+      ["respostas_sociais", req.params.id]
     );
-    await pool.query("DELETE FROM Respostas_Sociais WHERE id = ?", [
+    await pool.query("DELETE FROM respostas_sociais WHERE id = $1", [
       req.params.id,
     ]);
     res.json({

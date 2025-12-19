@@ -182,8 +182,8 @@ A interface é totalmente responsiva:
 
 ### "Erro ao conectar à base de dados"
 
-**Causa:** MySQL não está a correr
-**Solução:** Veja [INSTALAR_MYSQL.md](INSTALAR_MYSQL.md)
+**Causa:** Supabase não está acessível ou DATABASE_URL incorreta
+**Solução:** Verifique conexão à internet e DATABASE_URL no ficheiro .env
 
 ---
 

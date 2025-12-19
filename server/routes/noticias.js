@@ -9,16 +9,17 @@ router.get("/", async (req, res) => {
     const { tipo, limit, offset } = req.query;
     const isAuthenticated = req.headers.authorization;
 
-    let query = "SELECT * FROM Noticias_Eventos";
+    let query = "SELECT * FROM noticias_eventos";
     const params = [];
     const conditions = [];
+    let paramIndex = 1;
 
     if (!isAuthenticated) {
-      conditions.push("publicado = TRUE");
+      conditions.push("publicado = true");
     }
 
     if (tipo) {
-      conditions.push("tipo = ?");
+      conditions.push(`tipo = $${paramIndex++}`);
       params.push(tipo);
     }
 
@@ -29,11 +30,11 @@ router.get("/", async (req, res) => {
     query += " ORDER BY data_publicacao DESC";
 
     if (limit) {
-      query += " LIMIT ?";
+      query += ` LIMIT $${paramIndex++}`;
       params.push(parseInt(limit));
 
       if (offset) {
-        query += " OFFSET ?";
+        query += ` OFFSET $${paramIndex++}`;
         params.push(parseInt(offset));
       }
     }
@@ -51,7 +52,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const [noticias] = await pool.query(
-      "SELECT * FROM Noticias_Eventos WHERE id = ?",
+      "SELECT * FROM noticias_eventos WHERE id = $1",
       [req.params.id]
     );
 
@@ -62,8 +63,8 @@ router.get("/:id", async (req, res) => {
     }
 
     const [media] = await pool.query(
-      "SELECT * FROM Media WHERE tabela_referencia = ? AND id_referencia = ? ORDER BY ordem ASC",
-      ["Noticias_Eventos", req.params.id]
+      "SELECT * FROM media WHERE tabela_referencia = $1 AND id_referencia = $2 ORDER BY ordem ASC",
+      ["noticias_eventos", req.params.id]
     );
 
     res.json({ success: true, data: { ...noticias[0], media } });
@@ -80,8 +81,8 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       req.body;
 
     const [result] = await pool.query(
-      `INSERT INTO Noticias_Eventos (titulo, resumo, conteudo, tipo, autor, imagem_destaque, publicado, data_publicacao, criado_por) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO noticias_eventos (titulo, resumo, conteudo, tipo, autor, imagem_destaque, publicado, data_publicacao, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
         titulo,
         resumo,
@@ -95,13 +96,11 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       ]
     );
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Notícia criada com sucesso.",
-        data: { id: result.insertId },
-      });
+    res.status(201).json({
+      success: true,
+      message: "Notícia criada com sucesso.",
+      data: { id: result[0].id },
+    });
   } catch (error) {
     console.error("Erro ao criar notícia:", error);
     res.status(500).json({ success: false, message: "Erro no servidor." });
@@ -116,32 +115,33 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     const updates = [];
     const values = [];
+    let paramIndex = 1;
 
     if (titulo) {
-      updates.push("titulo = ?");
+      updates.push(`titulo = $${paramIndex++}`);
       values.push(titulo);
     }
     if (resumo) {
-      updates.push("resumo = ?");
+      updates.push(`resumo = $${paramIndex++}`);
       values.push(resumo);
     }
     if (conteudo !== undefined) {
-      updates.push("conteudo = ?");
+      updates.push(`conteudo = $${paramIndex++}`);
       values.push(conteudo);
     }
     if (tipo) {
-      updates.push("tipo = ?");
+      updates.push(`tipo = $${paramIndex++}`);
       values.push(tipo);
     }
     if (imagem_destaque !== undefined) {
-      updates.push("imagem_destaque = ?");
+      updates.push(`imagem_destaque = $${paramIndex++}`);
       values.push(imagem_destaque);
     }
     if (typeof publicado !== "undefined") {
-      updates.push("publicado = ?");
+      updates.push(`publicado = $${paramIndex++}`);
       values.push(publicado);
       if (publicado) {
-        updates.push("data_publicacao = ?");
+        updates.push(`data_publicacao = $${paramIndex++}`);
         values.push(new Date());
       }
     }
@@ -154,7 +154,9 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     values.push(req.params.id);
     await pool.query(
-      `UPDATE Noticias_Eventos SET ${updates.join(", ")} WHERE id = ?`,
+      `UPDATE noticias_eventos SET ${updates.join(
+        ", "
+      )} WHERE id = $${paramIndex}`,
       values
     );
 
@@ -169,10 +171,10 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
     await pool.query(
-      "DELETE FROM Media WHERE tabela_referencia = ? AND id_referencia = ?",
-      ["Noticias_Eventos", req.params.id]
+      "DELETE FROM media WHERE tabela_referencia = $1 AND id_referencia = $2",
+      ["noticias_eventos", req.params.id]
     );
-    await pool.query("DELETE FROM Noticias_Eventos WHERE id = ?", [
+    await pool.query("DELETE FROM noticias_eventos WHERE id = $1", [
       req.params.id,
     ]);
 

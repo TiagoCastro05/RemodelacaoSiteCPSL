@@ -8,16 +8,17 @@ const upload = require("../middleware/upload");
 router.get("/", async (req, res) => {
   try {
     const { ano, tipo } = req.query;
-    let query = "SELECT * FROM Transparencia";
+    let query = "SELECT * FROM transparencia";
     const params = [];
     const conditions = [];
+    let paramIndex = 1;
 
     if (ano) {
-      conditions.push("ano = ?");
+      conditions.push(`ano = $${paramIndex++}`);
       params.push(ano);
     }
     if (tipo) {
-      conditions.push("tipo = ?");
+      conditions.push(`tipo = $${paramIndex++}`);
       params.push(tipo);
     }
 
@@ -52,8 +53,8 @@ router.post(
       const tamanho = (req.file.size / 1024).toFixed(2) + " KB";
 
       const [result] = await pool.query(
-        `INSERT INTO Transparencia (titulo, descricao, ano, tipo, ficheiro_url, tamanho_ficheiro, criado_por) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO transparencia (titulo, descricao, ano, tipo, ficheiro_url, tamanho_ficheiro, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [
           titulo,
           descricao || null,
@@ -65,13 +66,11 @@ router.post(
         ]
       );
 
-      res
-        .status(201)
-        .json({
-          success: true,
-          message: "Documento adicionado com sucesso.",
-          data: { id: result.insertId },
-        });
+      res.status(201).json({
+        success: true,
+        message: "Documento adicionado com sucesso.",
+        data: { id: result[0].id },
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: "Erro no servidor." });
     }
@@ -81,7 +80,9 @@ router.post(
 // DELETE - Eliminar documento
 router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
-    await pool.query("DELETE FROM Transparencia WHERE id = ?", [req.params.id]);
+    await pool.query("DELETE FROM transparencia WHERE id = $1", [
+      req.params.id,
+    ]);
     res.json({ success: true, message: "Documento eliminado com sucesso." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Erro no servidor." });

@@ -12,8 +12,8 @@ router.get("/", [authenticate, isAdmin], async (req, res) => {
   try {
     const [users] = await pool.query(
       `SELECT id, nome, email, tipo, ativo, data_criacao, 
-       (SELECT nome FROM Utilizadores u2 WHERE u2.id = Utilizadores.criado_por) as criado_por_nome
-       FROM Utilizadores 
+       (SELECT nome FROM utilizadores u2 WHERE u2.id = utilizadores.criado_por) as criado_por_nome
+       FROM utilizadores 
        ORDER BY data_criacao DESC`
     );
 
@@ -59,7 +59,7 @@ router.post(
 
       // Verificar se email já existe
       const [existing] = await pool.query(
-        "SELECT id FROM Utilizadores WHERE email = ?",
+        "SELECT id FROM utilizadores WHERE email = $1",
         [email]
       );
 
@@ -76,7 +76,7 @@ router.post(
 
       // Inserir utilizador
       const [result] = await pool.query(
-        "INSERT INTO Utilizadores (nome, email, password_hash, tipo, criado_por) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO utilizadores (nome, email, password_hash, tipo, criado_por) VALUES ($1, $2, $3, $4, $5) RETURNING *",
         [nome, email, hashedPassword, tipo, req.user.id]
       );
 
@@ -84,7 +84,7 @@ router.post(
         success: true,
         message: "Utilizador criado com sucesso.",
         data: {
-          id: result.insertId,
+          id: result[0].id,
           nome,
           email,
           tipo,
@@ -130,7 +130,7 @@ router.put(
 
       // Verificar se utilizador existe
       const [existing] = await pool.query(
-        "SELECT id FROM Utilizadores WHERE id = ?",
+        "SELECT id FROM utilizadores WHERE id = $1",
         [id]
       );
 
@@ -144,7 +144,7 @@ router.put(
       // Verificar se email já está em uso por outro utilizador
       if (email) {
         const [emailCheck] = await pool.query(
-          "SELECT id FROM Utilizadores WHERE email = ? AND id != ?",
+          "SELECT id FROM utilizadores WHERE email = $1 AND id != $2",
           [email, id]
         );
 
@@ -159,21 +159,22 @@ router.put(
       // Construir query de atualização
       const updates = [];
       const values = [];
+      let paramCount = 1;
 
       if (nome) {
-        updates.push("nome = ?");
+        updates.push(`nome = $${paramCount++}`);
         values.push(nome);
       }
       if (email) {
-        updates.push("email = ?");
+        updates.push(`email = $${paramCount++}`);
         values.push(email);
       }
       if (tipo) {
-        updates.push("tipo = ?");
+        updates.push(`tipo = $${paramCount++}`);
         values.push(tipo);
       }
       if (typeof ativo !== "undefined") {
-        updates.push("ativo = ?");
+        updates.push(`ativo = $${paramCount++}`);
         values.push(ativo);
       }
 
@@ -187,7 +188,9 @@ router.put(
       values.push(id);
 
       await pool.query(
-        `UPDATE Utilizadores SET ${updates.join(", ")} WHERE id = ?`,
+        `UPDATE utilizadores SET ${updates.join(
+          ", "
+        )} WHERE id = $${paramCount}`,
         values
       );
 
@@ -222,7 +225,7 @@ router.delete("/:id", [authenticate, isAdmin], async (req, res) => {
 
     // Verificar se utilizador existe
     const [existing] = await pool.query(
-      "SELECT id FROM Utilizadores WHERE id = ?",
+      "SELECT id FROM utilizadores WHERE id = $1",
       [id]
     );
 
@@ -234,7 +237,7 @@ router.delete("/:id", [authenticate, isAdmin], async (req, res) => {
     }
 
     // Eliminar utilizador
-    await pool.query("DELETE FROM Utilizadores WHERE id = ?", [id]);
+    await pool.query("DELETE FROM utilizadores WHERE id = $1", [id]);
 
     res.json({
       success: true,
@@ -269,7 +272,7 @@ router.patch(
 
       // Obter estado atual
       const [user] = await pool.query(
-        "SELECT id, ativo FROM Utilizadores WHERE id = ?",
+        "SELECT id, ativo FROM utilizadores WHERE id = $1",
         [id]
       );
 
@@ -282,7 +285,7 @@ router.patch(
 
       // Alternar estado
       const newStatus = !user[0].ativo;
-      await pool.query("UPDATE Utilizadores SET ativo = ? WHERE id = ?", [
+      await pool.query("UPDATE utilizadores SET ativo = $1 WHERE id = $2", [
         newStatus,
         id,
       ]);

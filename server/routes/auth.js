@@ -29,7 +29,7 @@ router.post(
 
       // Verificar se utilizador existe
       const [users] = await pool.query(
-        "SELECT * FROM Utilizadores WHERE email = ? AND ativo = TRUE",
+        "SELECT * FROM utilizadores WHERE email = $1 AND ativo = true",
         [email]
       );
 

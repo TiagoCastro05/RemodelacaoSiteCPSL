@@ -7,11 +7,11 @@ const { authenticate, isAdminOrGestor } = require("../middleware/auth");
 router.get("/", async (req, res) => {
   try {
     const { secao } = req.query;
-    let query = "SELECT * FROM Conteudo_Institucional WHERE ativo = TRUE";
+    let query = "SELECT * FROM conteudo_institucional WHERE ativo = true";
     const params = [];
 
     if (secao) {
-      query += " AND secao = ?";
+      query += " AND secao = $1";
       params.push(secao);
     }
 
@@ -30,33 +30,34 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     const { titulo, subtitulo, conteudo, imagem, video_url, ativo } = req.body;
     const updates = [];
     const values = [];
+    let paramIndex = 1;
 
     if (titulo !== undefined) {
-      updates.push("titulo = ?");
+      updates.push(`titulo = $${paramIndex++}`);
       values.push(titulo);
     }
     if (subtitulo !== undefined) {
-      updates.push("subtitulo = ?");
+      updates.push(`subtitulo = $${paramIndex++}`);
       values.push(subtitulo);
     }
     if (conteudo !== undefined) {
-      updates.push("conteudo = ?");
+      updates.push(`conteudo = $${paramIndex++}`);
       values.push(conteudo);
     }
     if (imagem !== undefined) {
-      updates.push("imagem = ?");
+      updates.push(`imagem = $${paramIndex++}`);
       values.push(imagem);
     }
     if (video_url !== undefined) {
-      updates.push("video_url = ?");
+      updates.push(`video_url = $${paramIndex++}`);
       values.push(video_url);
     }
     if (ativo !== undefined) {
-      updates.push("ativo = ?");
+      updates.push(`ativo = $${paramIndex++}`);
       values.push(ativo);
     }
 
-    updates.push("atualizado_por = ?");
+    updates.push(`atualizado_por = $${paramIndex++}`);
     values.push(req.user.id);
 
     if (updates.length === 1) {
@@ -67,7 +68,9 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     values.push(req.params.id);
     await pool.query(
-      `UPDATE Conteudo_Institucional SET ${updates.join(", ")} WHERE id = ?`,
+      `UPDATE conteudo_institucional SET ${updates.join(
+        ", "
+      )} WHERE id = $${paramIndex}`,
       values
     );
 

@@ -16,7 +16,7 @@ router.get("/", async (req, res) => {
     }
 
     const [media] = await pool.query(
-      "SELECT * FROM Media WHERE tabela_referencia = ? AND id_referencia = ? ORDER BY ordem ASC",
+      "SELECT * FROM media WHERE tabela_referencia = $1 AND id_referencia = $2 ORDER BY ordem ASC",
       [tabela_referencia, id_referencia]
     );
 
@@ -60,8 +60,8 @@ router.post(
       }
 
       const [result] = await pool.query(
-        `INSERT INTO Media (tipo, nome, url, descricao, tamanho, mime_type, tabela_referencia, id_referencia, ordem, criado_por) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO media (tipo, nome, url, descricao, tamanho, mime_type, tabela_referencia, id_referencia, ordem, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
         [
           tipoMedia,
           nome,
@@ -76,13 +76,11 @@ router.post(
         ]
       );
 
-      res
-        .status(201)
-        .json({
-          success: true,
-          message: "Media adicionada com sucesso.",
-          data: { id: result.insertId, url: mediaUrl },
-        });
+      res.status(201).json({
+        success: true,
+        message: "Media adicionada com sucesso.",
+        data: { id: result[0].id, url: mediaUrl },
+      });
     } catch (error) {
       console.error("Erro ao adicionar media:", error);
       res.status(500).json({ success: false, message: "Erro no servidor." });
@@ -93,7 +91,7 @@ router.post(
 // DELETE - Eliminar media
 router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
-    await pool.query("DELETE FROM Media WHERE id = ?", [req.params.id]);
+    await pool.query("DELETE FROM media WHERE id = $1", [req.params.id]);
     res.json({ success: true, message: "Media eliminada com sucesso." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Erro no servidor." });

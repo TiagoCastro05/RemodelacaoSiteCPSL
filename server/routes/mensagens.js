@@ -8,12 +8,13 @@ const nodemailer = require("nodemailer");
 router.get("/", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
     const { respondido } = req.query;
-    let query = "SELECT * FROM Form_Contacto";
+    let query = "SELECT * FROM form_contacto";
     const params = [];
+    let paramIndex = 1;
 
     if (respondido !== undefined) {
-      query += " WHERE respondido = ?";
-      params.push(respondido === "true" ? 1 : 0);
+      query += ` WHERE respondido = $${paramIndex++}`;
+      params.push(respondido === "true");
     }
 
     query += " ORDER BY data_submissao DESC";
@@ -42,7 +43,7 @@ router.post(
 
       // Obter mensagem original
       const [mensagens] = await pool.query(
-        "SELECT * FROM Form_Contacto WHERE id = ?",
+        "SELECT * FROM form_contacto WHERE id = $1",
         [id]
       );
 
@@ -85,7 +86,7 @@ router.post(
 
         // Atualizar na base de dados
         await pool.query(
-          "UPDATE Form_Contacto SET respondido = TRUE, resposta = ?, respondido_por = ?, data_resposta = NOW() WHERE id = ?",
+          "UPDATE form_contacto SET respondido = true, resposta = $1, respondido_por = $2, data_resposta = NOW() WHERE id = $3",
           [resposta, req.user.id, id]
         );
 
@@ -106,7 +107,9 @@ router.post(
 // DELETE - Eliminar mensagem
 router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
-    await pool.query("DELETE FROM Form_Contacto WHERE id = ?", [req.params.id]);
+    await pool.query("DELETE FROM form_contacto WHERE id = $1", [
+      req.params.id,
+    ]);
     res.json({ success: true, message: "Mensagem eliminada com sucesso." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Erro no servidor." });

@@ -11,9 +11,9 @@ router.get("/", async (req, res) => {
   try {
     const isAuthenticated = req.headers.authorization;
 
-    let query = "SELECT * FROM Projetos";
+    let query = "SELECT * FROM projetos";
     if (!isAuthenticated) {
-      query += " WHERE ativo = TRUE";
+      query += " WHERE ativo = true";
     }
     query += " ORDER BY ordem ASC, data_inicio DESC";
 
@@ -39,9 +39,10 @@ router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [projetos] = await pool.query("SELECT * FROM Projetos WHERE id = ?", [
-      id,
-    ]);
+    const [projetos] = await pool.query(
+      "SELECT * FROM projetos WHERE id = $1",
+      [id]
+    );
 
     if (projetos.length === 0) {
       return res.status(404).json({
@@ -52,8 +53,8 @@ router.get("/:id", async (req, res) => {
 
     // Obter media associada
     const [media] = await pool.query(
-      "SELECT * FROM Media WHERE tabela_referencia = ? AND id_referencia = ? ORDER BY ordem ASC",
-      ["Projetos", id]
+      "SELECT * FROM media WHERE tabela_referencia = $1 AND id_referencia = $2 ORDER BY ordem ASC",
+      ["projetos", id]
     );
 
     res.json({
@@ -106,8 +107,8 @@ router.post(
       } = req.body;
 
       const [result] = await pool.query(
-        `INSERT INTO Projetos (titulo, descricao, data_inicio, data_fim, imagem_destaque, url_externa, ativo, ordem, criado_por) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO projetos (titulo, descricao, data_inicio, data_fim, imagem_destaque, url_externa, ativo, ordem, criado_por) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
         [
           titulo,
           descricao,
@@ -125,7 +126,7 @@ router.post(
         success: true,
         message: "Projeto criado com sucesso.",
         data: {
-          id: result.insertId,
+          id: result[0].id,
           titulo,
         },
       });
@@ -157,7 +158,7 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     } = req.body;
 
     const [existing] = await pool.query(
-      "SELECT id FROM Projetos WHERE id = ?",
+      "SELECT id FROM projetos WHERE id = $1",
       [id]
     );
 
@@ -170,37 +171,38 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     const updates = [];
     const values = [];
+    let paramCount = 1;
 
     if (titulo) {
-      updates.push("titulo = ?");
+      updates.push(`titulo = $${paramCount++}`);
       values.push(titulo);
     }
     if (descricao) {
-      updates.push("descricao = ?");
+      updates.push(`descricao = $${paramCount++}`);
       values.push(descricao);
     }
     if (data_inicio) {
-      updates.push("data_inicio = ?");
+      updates.push(`data_inicio = $${paramCount++}`);
       values.push(data_inicio);
     }
     if (data_fim !== undefined) {
-      updates.push("data_fim = ?");
+      updates.push(`data_fim = $${paramCount++}`);
       values.push(data_fim || null);
     }
     if (imagem_destaque !== undefined) {
-      updates.push("imagem_destaque = ?");
+      updates.push(`imagem_destaque = $${paramCount++}`);
       values.push(imagem_destaque || null);
     }
     if (url_externa !== undefined) {
-      updates.push("url_externa = ?");
+      updates.push(`url_externa = $${paramCount++}`);
       values.push(url_externa || null);
     }
     if (typeof ativo !== "undefined") {
-      updates.push("ativo = ?");
+      updates.push(`ativo = $${paramCount++}`);
       values.push(ativo);
     }
     if (ordem !== undefined) {
-      updates.push("ordem = ?");
+      updates.push(`ordem = $${paramCount++}`);
       values.push(ordem);
     }
 
@@ -214,7 +216,7 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     values.push(id);
 
     await pool.query(
-      `UPDATE Projetos SET ${updates.join(", ")} WHERE id = ?`,
+      `UPDATE projetos SET ${updates.join(", ")} WHERE id = $${paramCount}`,
       values
     );
 
@@ -239,7 +241,7 @@ router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     const { id } = req.params;
 
     const [existing] = await pool.query(
-      "SELECT id FROM Projetos WHERE id = ?",
+      "SELECT id FROM projetos WHERE id = $1",
       [id]
     );
 
@@ -252,12 +254,12 @@ router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     // Eliminar media associada
     await pool.query(
-      "DELETE FROM Media WHERE tabela_referencia = ? AND id_referencia = ?",
-      ["Projetos", id]
+      "DELETE FROM media WHERE tabela_referencia = $1 AND id_referencia = $2",
+      ["projetos", id]
     );
 
     // Eliminar projeto
-    await pool.query("DELETE FROM Projetos WHERE id = ?", [id]);
+    await pool.query("DELETE FROM projetos WHERE id = $1", [id]);
 
     res.json({
       success: true,

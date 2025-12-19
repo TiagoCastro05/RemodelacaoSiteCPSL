@@ -10,7 +10,7 @@ const nodemailer = require("nodemailer");
 router.get("/", async (req, res) => {
   try {
     const [contactos] = await pool.query(
-      "SELECT * FROM Contactos_Institucionais WHERE ativo = TRUE ORDER BY ordem ASC"
+      "SELECT * FROM contactos_institucionais WHERE ativo = true ORDER BY ordem ASC"
     );
 
     res.json({
@@ -51,7 +51,7 @@ router.post(
 
       // Inserir na base de dados
       await pool.query(
-        "INSERT INTO Form_Contacto (nome, email, assunto, mensagem) VALUES (?, ?, ?, ?)",
+        "INSERT INTO form_contacto (nome, email, assunto, mensagem) VALUES ($1, $2, $3, $4)",
         [nome, email, assunto, mensagem]
       );
 
