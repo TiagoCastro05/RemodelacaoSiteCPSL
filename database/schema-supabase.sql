@@ -75,7 +75,9 @@ CREATE TABLE IF NOT EXISTS conteudo_institucional (
     video_url VARCHAR(500),
     ordem INTEGER DEFAULT 0,
     ativo BOOLEAN DEFAULT true,
+    criado_por INTEGER,
     atualizado_por INTEGER,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

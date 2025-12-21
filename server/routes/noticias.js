@@ -99,7 +99,7 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Notícia criada com sucesso.",
-      data: { id: result[0].id },
+      data: result[0],
     });
   } catch (error) {
     console.error("Erro ao criar notícia:", error);

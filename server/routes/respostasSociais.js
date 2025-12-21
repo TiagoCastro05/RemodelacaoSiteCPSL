@@ -79,7 +79,7 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Resposta social criada com sucesso.",
-      data: { id: result[0].id },
+      data: result[0],
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Erro no servidor." });

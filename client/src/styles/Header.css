@@ -10,6 +10,12 @@
   transition: all 0.3s ease;
 }
 
+/* Header dentro da dashboard - abaixo do admin-bar */
+.dashboard .main-header {
+  top: 60px; /* Altura do admin-bar */
+  z-index: 1500; /* Entre o admin-bar (2000) e o conteúdo */
+}
+
 .main-header.scrolled {
   background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 2px 15px rgba(0, 0, 0, 0.15);

@@ -9,7 +9,9 @@ const pool = new Pool({
   },
   max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000, // Aumentado para 10 segundos
+  // Forçar uso de IPv4
+  options: "-c client_encoding=UTF8",
 });
 
 // Testar conexão

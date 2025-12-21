@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "../styles/Header.css";
 
-const Header = ({ sections = [] }) => {
+const Header = ({ sections = [], isEditMode = false }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -31,6 +31,24 @@ const Header = ({ sections = [] }) => {
   const handleNavClick = (e, sectionId) => {
     e.preventDefault();
     setIsMobileMenuOpen(false);
+
+    // Se estamos no modo de edição (dashboard), não mudar de página
+    if (isEditMode || location.pathname.startsWith("/dashboard")) {
+      // Scroll suave para a secção dentro da dashboard
+      const element = document.getElementById(sectionId);
+      if (element) {
+        const headerOffset = 160; // Admin bar + header
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition =
+          elementPosition + window.pageYOffset - headerOffset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+      }
+      return;
+    }
 
     // Se não estamos na home, navegar para lá primeiro
     if (location.pathname !== "/") {

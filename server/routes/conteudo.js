@@ -24,10 +24,97 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST - Criar novo conteúdo institucional
+router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
+  try {
+    console.log("POST /conteudo - Body recebido:", req.body);
+    console.log("POST /conteudo - User:", req.user);
+
+    const {
+      titulo,
+      texto,
+      conteudo,
+      secao = "instituicao",
+      imagem_url,
+      video_url,
+    } = req.body;
+
+    // Suportar tanto 'texto' quanto 'conteudo'
+    const conteudoFinal = conteudo || texto;
+
+    console.log("Validação - titulo:", titulo, "conteudoFinal:", conteudoFinal);
+
+    if (!titulo || !conteudoFinal) {
+      console.log("Validação FALHOU - retornando 400");
+      return res.status(400).json({
+        success: false,
+        message: "Título e conteúdo são obrigatórios.",
+      });
+    }
+
+    // Buscar próxima ordem
+    const [maxOrdem] = await pool.query(
+      "SELECT COALESCE(MAX(ordem), 0) as max_ordem FROM conteudo_institucional WHERE secao = $1",
+      [secao]
+    );
+    const ordem = (maxOrdem[0]?.max_ordem || 0) + 1;
+
+    const [result] = await pool.query(
+      `INSERT INTO conteudo_institucional 
+        (secao, titulo, subtitulo, conteudo, imagem, video_url, ordem, ativo, criado_por, atualizado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9) 
+       RETURNING *`,
+      [
+        secao,
+        titulo,
+        "",
+        conteudoFinal,
+        imagem_url || null,
+        video_url || null,
+        ordem,
+        req.user.id,
+        req.user.id,
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: "Conteúdo criado com sucesso.",
+      data: result[0],
+    });
+  } catch (error) {
+    console.error("Erro ao criar conteúdo:", error);
+    res.status(500).json({ success: false, message: "Erro no servidor." });
+  }
+});
+
+// DELETE - Eliminar conteúdo institucional
+router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
+  try {
+    await pool.query(
+      "UPDATE conteudo_institucional SET ativo = false WHERE id = $1",
+      [req.params.id]
+    );
+    res.json({ success: true, message: "Conteúdo eliminado com sucesso." });
+  } catch (error) {
+    console.error("Erro ao eliminar conteúdo:", error);
+    res.status(500).json({ success: false, message: "Erro no servidor." });
+  }
+});
+
 // PUT - Atualizar conteúdo institucional
 router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
-    const { titulo, subtitulo, conteudo, imagem, video_url, ativo } = req.body;
+    const {
+      titulo,
+      texto,
+      subtitulo,
+      conteudo,
+      imagem,
+      imagem_url,
+      video_url,
+      ativo,
+    } = req.body;
     const updates = [];
     const values = [];
     let paramIndex = 1;
@@ -40,13 +127,21 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       updates.push(`subtitulo = $${paramIndex++}`);
       values.push(subtitulo);
     }
+    // Suportar tanto 'conteudo' quanto 'texto'
     if (conteudo !== undefined) {
       updates.push(`conteudo = $${paramIndex++}`);
       values.push(conteudo);
+    } else if (texto !== undefined) {
+      updates.push(`conteudo = $${paramIndex++}`);
+      values.push(texto);
     }
     if (imagem !== undefined) {
       updates.push(`imagem = $${paramIndex++}`);
       values.push(imagem);
+    }
+    if (imagem_url !== undefined) {
+      updates.push(`imagem = $${paramIndex++}`);
+      values.push(imagem_url);
     }
     if (video_url !== undefined) {
       updates.push(`video_url = $${paramIndex++}`);
@@ -67,15 +162,20 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     }
 
     values.push(req.params.id);
-    await pool.query(
+    const [result] = await pool.query(
       `UPDATE conteudo_institucional SET ${updates.join(
         ", "
-      )} WHERE id = $${paramIndex}`,
+      )} WHERE id = $${paramIndex} RETURNING *`,
       values
     );
 
-    res.json({ success: true, message: "Conteúdo atualizado com sucesso." });
+    res.json({
+      success: true,
+      message: "Conteúdo atualizado com sucesso.",
+      data: result[0],
+    });
   } catch (error) {
+    console.error("Erro ao atualizar conteúdo:", error);
     res.status(500).json({ success: false, message: "Erro no servidor." });
   }
 });
