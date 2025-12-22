@@ -1,0 +1,62 @@
+/* client/src/styles/Navbar.css */
+
+.fixed-navbar {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    
+background-color: rgba(255, 116, 0, 0.4); /* 0.9 = 90% opacidade */    
+box-shadow: 0 2px 5px rgba(255, 116, 0, 0.3);    z-index: 1000;
+    
+    /* REMOVIDO: display: flex; justify-content: center; */ 
+    /* Colocamos estes estilos no .navbar-container */
+
+    height: 80px; /* Altura do seu Header/Navbar */
+}
+
+/* CONTAINER PRINCIPAL: GERE O ESPAÇAMENTO ENTRE LOGO E LINKS */
+.navbar-content {
+    display: flex; 
+    
+    /* ALTERAÇÃO CHAVE: Juntamos os elementos no início do contentor */
+    justify-content: flex-start; 
+    
+    /* Alinha os itens verticalmente (ao centro) */
+    align-items: center; 
+    
+    width: 90%; 
+    height: 100%;
+    margin: 0 auto; /* Centraliza o contentor de 90% */
+    
+    /* OBRIGATÓRIO: Espaço entre o Logo e o Menu de Links */
+    gap: 150px; /* Adicione um gap de, por exemplo, 50px */
+}
+
+/* LINKS DE NAVEGAÇÃO: ORGANIZA AS SECÇÕES */
+.nav-links {
+    /* Transforma o menu de links numa linha Flex */
+    display: flex;
+    
+    /* Espaçamento entre os links (ajuste este valor!) */
+    gap: 25px; 
+    
+    /* Alinha os links verticalmente (se necessário) */
+    align-items: center; 
+}
+
+/* Estilos para cada Link (ajustar cores e padding) */
+.nav-links a {
+    text-decoration: none;
+    color: #333; /* Cor do texto (ajuste) */
+    padding: 10px 15px;
+    font-size: 16px;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: #FF6600; /* Cor ao passar o rato (ajuste) */
+}
+
+/* OBRIGATÓRIO: Compensação para o conteúdo (MANTENHA NO GLOBAL.CSS!) */
+/* body { padding-top: 80px; } */

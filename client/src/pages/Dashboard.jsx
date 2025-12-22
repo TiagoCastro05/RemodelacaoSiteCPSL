@@ -1,4 +1,5 @@
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
+import api from "../services/api";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import Users from "./Users";
@@ -6,11 +7,46 @@ import ProjectsManagement from "./ProjectsManagement";
 import ContentManagement from "./ContentManagement";
 import Home from "./Home";
 import Profile from "./Profile";
+import Messages from "./Messages";
 import "../styles/Dashboard.css";
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const resp = await api.get('/mensagens?respondido=false');
+        if (resp.data && resp.data.success) setUnread((resp.data.data || []).length);
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchUnread();
+    // listen to messages updates from Messages component
+    const handler = (e) => {
+      if (e && e.detail && typeof e.detail.unread === 'number') setUnread(e.detail.unread);
+    };
+    const handlerServer = (e) => {
+      if (e && e.detail && typeof e.detail.unread === 'number') setUnread(e.detail.unread);
+    };
+    window.addEventListener('mensagens:updated', handler);
+    window.addEventListener('mensagens:server', handlerServer);
+
+    // also refetch when window/tab becomes visible to ensure accurate badge after background changes
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchUnread();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      window.removeEventListener('mensagens:updated', handler);
+      window.removeEventListener('mensagens:server', handlerServer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   return (
     <div className="dashboard">
@@ -34,6 +70,13 @@ const Dashboard = () => {
             className="btn-admin-action"
           >
             📁 Gerir Projetos
+          </button>
+          <button
+            onClick={() => navigate("/dashboard/mensagens")}
+            className="btn-admin-action"
+            title="Mensagens"
+          >
+            ✉️ Mensagens {unread > 0 && <span className="badge-dot" aria-hidden="true" />}
           </button>
           <button
             onClick={() => navigate("/dashboard/conteudo")}
@@ -62,6 +105,7 @@ const Dashboard = () => {
       <Routes>
         {/* Dashboard principal agora mostra o site público com edição inline */}
         <Route path="/" element={<Home isEditMode={true} />} />
+  <Route path="/mensagens" element={<Messages />} />
         <Route path="/conteudo" element={<ContentManagement />} />
         <Route path="/projetos" element={<ProjectsManagement />} />
         <Route path="/perfil" element={<Profile />} />

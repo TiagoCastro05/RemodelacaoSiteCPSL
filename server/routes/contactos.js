@@ -49,25 +49,33 @@ router.post(
 
       const { nome, email, assunto, mensagem } = req.body;
 
+      // log for debugging duplicate submissions
+      console.log('[contactos] new submission:', { nome, email, assunto });
+
+      // Prevent duplicate submissions: if an identical message was submitted in the last 60 seconds, ignore
+      try {
+        const checkSql = `SELECT COUNT(*) as cnt FROM form_contacto WHERE nome = $1 AND email = $2 AND assunto = $3 AND mensagem = $4 AND data_submissao >= NOW() - INTERVAL '60 seconds'`;
+        const [rows] = await pool.query(checkSql, [nome, email, assunto, mensagem]);
+        const cnt = parseInt(rows[0]?.cnt || rows.cnt || 0, 10);
+        if (cnt > 0) {
+          console.warn('[contactos] duplicate submission detected within 60s - ignoring insert');
+          return res.status(200).json({ success: true, message: 'Mensagem recebida (duplicado detectado).' });
+        }
+      } catch (checkErr) {
+        console.error('[contactos] duplicate check failed:', checkErr);
+        // continue to insert if check failed
+      }
+
       // Inserir na base de dados
       await pool.query(
         "INSERT INTO form_contacto (nome, email, assunto, mensagem) VALUES ($1, $2, $3, $4)",
         [nome, email, assunto, mensagem]
       );
 
-      // Enviar email de notificação (opcional)
+      // Enviar email de notificação (opcional) — feito de forma segura via util
       try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.EMAIL_HOST,
-          port: process.env.EMAIL_PORT,
-          secure: false,
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASSWORD,
-          },
-        });
-
-        await transporter.sendMail({
+        const { sendMailSafe } = require('../utils/email');
+        const mail = {
           from: process.env.EMAIL_FROM,
           to: process.env.EMAIL_FROM,
           subject: `Nova mensagem de contacto: ${assunto}`,
@@ -79,10 +87,13 @@ router.post(
           <p><strong>Mensagem:</strong></p>
           <p>${mensagem}</p>
         `,
-        });
+        };
+        const result = await sendMailSafe(mail);
+        if (!result.ok) {
+          console.warn('Notificação por email não enviada:', result.error && result.error.message ? result.error.message : result.error);
+        }
       } catch (emailError) {
-        console.error("Erro ao enviar email:", emailError);
-        // Não falhar o request se o email não for enviado
+        console.error('Erro ao tentar enviar notificação por email (unexpected):', emailError);
       }
 
       res.status(201).json({

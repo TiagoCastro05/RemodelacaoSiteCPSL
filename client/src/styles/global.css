@@ -23,6 +23,7 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background: var(--white);
+  padding-top: 80px; /* Igual à altura do .fixed-navbar */
 }
 
 .font-normal {

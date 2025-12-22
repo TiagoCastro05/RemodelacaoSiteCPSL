@@ -67,7 +67,13 @@ router.get("/:id", async (req, res) => {
       ["noticias_eventos", req.params.id]
     );
 
-    res.json({ success: true, data: { ...noticias[0], media } });
+    // If imagem_destaque is not set, use first media.url as fallback
+    const noticia = { ...noticias[0] };
+    if ((!noticia.imagem_destaque || noticia.imagem_destaque === "") && Array.isArray(media) && media.length > 0) {
+      noticia.imagem_destaque = media[0].url;
+    }
+
+    res.json({ success: true, data: { ...noticia, media } });
   } catch (error) {
     console.error("Erro ao obter notícia:", error);
     res.status(500).json({ success: false, message: "Erro no servidor." });

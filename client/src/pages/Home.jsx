@@ -1,8 +1,194 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
 import { AuthContext } from "../contexts/AuthContext";
 import "../styles/Home.css";
+
+// Local SVG placeholder (data URI) to avoid external requests to via.placeholder.com
+const PLACEHOLDER_SVG = `data:image/svg+xml;utf8,` + encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'><rect fill='#f6f7fb' width='100%' height='100%'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#888' font-size='28' font-family='Arial, sans-serif'>Imagem</text></svg>`
+);
+
+// Editor simples baseado em contentEditable (compatível com React 19+)
+function RichTextEditor({ value, onChange, api }) {
+  const editorRef = useRef(null);
+  const [formats, setFormats] = useState({ bold: false, italic: false, underline: false, list: false });
+
+  // Upload de imagem para /api/media e retorna URL absoluto
+  const uploadImage = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+  formData.append("tabela_referencia", "noticias_eventos");
+
+      const response = await api.post("/media", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const url = response.data?.data?.url;
+      if (!url) throw new Error("Upload não retornou URL");
+      const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+      return url.startsWith("http") ? url : `${base}${url}`;
+    } catch (err) {
+      console.error("Erro ao enviar imagem:", err);
+      alert("Erro ao enviar imagem.");
+      return null;
+    }
+  };
+
+  const exec = (command, value = null) => {
+    // execCommand ainda funciona na maioria dos browsers para operações simples
+    document.execCommand(command, false, value);
+    // atualizar estado
+    onChange(editorRef.current.innerHTML);
+    // recolocar foco no editor para que a escrita continue e o caret seja preservado
+    try {
+      editorRef.current && editorRef.current.focus();
+    } catch (e) {
+      // ignore
+    }
+    // update our internal formats state only when user clicked toolbar
+    if (command === "bold") setFormats((p) => ({ ...p, bold: !p.bold }));
+    if (command === "italic") setFormats((p) => ({ ...p, italic: !p.italic }));
+    if (command === "underline") setFormats((p) => ({ ...p, underline: !p.underline }));
+    if (command === "insertUnorderedList") setFormats((p) => ({ ...p, list: !p.list }));
+  };
+
+  // Formats are updated only when the toolbar buttons are clicked (see exec()).
+
+  const handleInsertLink = () => {
+    const url = window.prompt("URL (inclui https://)");
+    if (url) exec("createLink", url);
+  };
+
+  const handleImagePick = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const url = await uploadImage(file);
+      if (url) {
+        // inserir imagem como HTML
+        const imgHtml = `<img src="${url}" alt="image" style="max-width:100%;"/>`;
+        document.execCommand("insertHTML", false, imgHtml);
+        onChange(editorRef.current.innerHTML);
+      }
+    };
+    input.click();
+  };
+
+  useEffect(() => {
+    if (editorRef.current) {
+      const normalized = normalizeInitialHtml(value || "");
+      if (editorRef.current.innerHTML !== normalized) {
+        editorRef.current.innerHTML = normalized;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  // ensure toolbar defaults to no active formats when mounting
+  useEffect(() => {
+    setFormats({ bold: false, italic: false, underline: false, list: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // no-op: we keep toolbar button state controlled only by toolbar clicks
+
+  return (
+    <div className="richtext-editor">
+      <div className="rt-toolbar">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} title="Bold" className={`rt-btn ${formats.bold ? 'active' : ''}`}>
+          <strong>B</strong>
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} title="Italic" className={`rt-btn ${formats.italic ? 'active' : ''}`}>
+          <em>I</em>
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} title="Underline" className={`rt-btn ${formats.underline ? 'active' : ''}`}>
+          <u>U</u>
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} title="Bullet" className={`rt-btn ${formats.list ? 'active' : ''}`}>
+          • Lista
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleInsertLink} title="Adicionar hiperligação" className="rt-btn rt-btn-link">
+          + adicionar hiperligacao
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleImagePick} title="Adicionar fotografia" className="rt-btn rt-btn-image">
+          🖼️
+        </button>
+        <select
+          onChange={(e) => exec("fontSize", e.target.value)}
+          defaultValue=""
+          aria-label="Tamanho da fonte"
+        >
+          <option value="">Tamanho</option>
+          <option value="1">Pequeno</option>
+          <option value="3">Normal</option>
+          <option value="5">Grande</option>
+        </select>
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        className="rt-editor-area"
+        onInput={(e) => onChange(e.currentTarget.innerHTML)}
+        onDoubleClick={(e) => e.preventDefault()} /* prevent double-click from triggering format toggles */
+        onFocus={() => {
+          // compute real format state at caret/selection and sync toolbar icons
+          try {
+            const sel = document.getSelection();
+            let bold = false;
+            let italic = false;
+            let underline = false;
+            let list = false;
+            if (sel && sel.rangeCount > 0) {
+              // prefer queryCommandState if available
+              try {
+                bold = document.queryCommandState('bold');
+                italic = document.queryCommandState('italic');
+                underline = document.queryCommandState('underline');
+                list = document.queryCommandState('insertUnorderedList');
+              } catch (e) {
+                // fallback: inspect ancestor nodes
+                const node = sel.anchorNode;
+                const el = node && node.nodeType === 3 ? node.parentElement : node;
+                if (el) {
+                  bold = !!el.closest && !!el.closest('strong, b');
+                  italic = !!el.closest && !!el.closest('em, i');
+                  underline = !!el.closest && !!el.closest('u');
+                  list = !!el.closest && !!el.closest('ul, ol');
+                }
+              }
+            }
+            setFormats({ bold, italic, underline, list });
+          } catch (err) {
+            // ignore
+          }
+        }}
+        style={{ minHeight: 150, border: "1px solid #ddd", padding: 8 }}
+      />
+    </div>
+  );
+}
+
+// utilitário simples para remover tags HTML (usado para resumo)
+function stripHtml(html) {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, "");
+}
+
+  // normalize initial HTML so we don't start with an outer strong/b tag which makes typing bold by default
+  function normalizeInitialHtml(html) {
+    if (!html) return "";
+    let out = html.trim();
+    // remove wrapping <strong> or <b> if entire content is inside it
+    out = out.replace(/^<(strong|b)>([\s\S]*)<\/(strong|b)>$/i, "$2");
+    // remove empty strong around whitespace
+    out = out.replace(/<strong>\s*<\/strong>/gi, "");
+    out = out.replace(/<b>\s*<\/b>/gi, "");
+    return out;
+  }
 
 const Home = ({ isEditMode = false }) => {
   const [projects, setProjects] = useState([]);
@@ -19,6 +205,33 @@ const Home = ({ isEditMode = false }) => {
   const [editingData, setEditingData] = useState({});
   const [editingId, setEditingId] = useState(null);
   const { user } = useContext(AuthContext);
+  const [showNewsModal, setShowNewsModal] = useState(false);
+  const [selectedNews, setSelectedNews] = useState(null);
+
+  // Upload cover image (imagem_destaque) and set editingData.imagem_destaque
+  const uploadCoverImage = async (file) => {
+    try {
+  // show placeholder immediately while upload runs
+  const placeholderBase = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  setEditingData((d) => ({ ...d, imagem_destaque: `${placeholderBase}${PLACEHOLDER_SVG}` }));
+
+      const formData = new FormData();
+      formData.append("file", file);
+  formData.append("tabela_referencia", "noticias_eventos");
+      // id_referencia could be null for now
+      const response = await api.post("/media", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+  let url = response.data?.data?.url;
+  if (!url) throw new Error("Upload não retornou URL");
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  url = url.startsWith("http") ? url : `${base}${url}`;
+  setEditingData((d) => ({ ...d, imagem_destaque: url }));
+    } catch (err) {
+      console.error("Erro ao enviar imagem de capa:", err);
+      alert("Erro ao enviar imagem de capa.");
+    }
+  };
 
   // Definir as secções do site
   const sections = [
@@ -95,7 +308,21 @@ const Home = ({ isEditMode = false }) => {
         setLoadingNoticias(true);
         const response = await api.get("/noticias");
         if (response.data.success) {
-          setNoticias(response.data.data || []);
+          const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+          const normalized = (response.data.data || []).map((n) => {
+            const obj = { ...n };
+            if (obj.imagem_destaque && !obj.imagem_destaque.startsWith("http")) {
+              obj.imagem_destaque = `${base}${obj.imagem_destaque}`;
+            }
+            if (Array.isArray(obj.media)) {
+              obj.media = obj.media.map((m) => ({
+                ...m,
+                url: m.url && !m.url.startsWith("http") ? `${base}${m.url}` : m.url,
+              }));
+            }
+            return obj;
+          });
+          setNoticias(normalized);
         }
       } catch (error) {
         console.error("Erro ao carregar notícias:", error);
@@ -191,6 +418,36 @@ const Home = ({ isEditMode = false }) => {
       console.error("Erro ao eliminar:", error);
       alert("Erro ao eliminar item.");
     }
+  };
+
+  const openNews = async (noticia) => {
+    try {
+      const resp = await api.get(`/noticias/${noticia.id}`);
+      if (resp.data && resp.data.success) {
+        const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+        const data = resp.data.data || {};
+        // normalize imagem_destaque
+        if (data.imagem_destaque && !data.imagem_destaque.startsWith("http")) {
+          data.imagem_destaque = `${base}${data.imagem_destaque}`;
+        }
+        // normalize media urls
+        if (Array.isArray(data.media)) {
+          data.media = data.media.map((m) => {
+            if (m.url && !m.url.startsWith("http")) {
+              return { ...m, url: `${base}${m.url}` };
+            }
+            return m;
+          });
+        }
+        setSelectedNews(data);
+      } else {
+        setSelectedNews(noticia);
+      }
+    } catch (err) {
+      console.error("Erro ao obter notícia completa:", err);
+      setSelectedNews(noticia);
+    }
+    setShowNewsModal(true);
   };
 
   // Salvar edição
@@ -371,8 +628,7 @@ const Home = ({ isEditMode = false }) => {
                         alt={project.titulo}
                         className="project-image"
                         onError={(e) => {
-                          e.target.src =
-                            "https://via.placeholder.com/800x400?text=Projeto";
+                            e.target.src = PLACEHOLDER_SVG;
                         }}
                       />
                     ) : (
@@ -380,6 +636,7 @@ const Home = ({ isEditMode = false }) => {
                         <span>📁 {project.titulo}</span>
                       </div>
                     )}
+
                     {project.url_externa && (
                       <div className="project-link-overlay">
                         <span>🔗 Clique para saber mais</span>
@@ -387,98 +644,26 @@ const Home = ({ isEditMode = false }) => {
                     )}
                   </div>
 
-                  <div className="project-info">
-                    <h3>
-                      {project.titulo}
-                      {project.url_externa && (
-                        <span className="link-icon">🔗</span>
-                      )}
-                    </h3>
-                    <p className="project-description">{project.descricao}</p>
-                    {project.data_inicio && (
-                      <p className="project-date">
-                        🗓️ Início:{" "}
-                        {new Date(project.data_inicio).toLocaleDateString(
-                          "pt-PT"
+                    <div className="project-info">
+                      <h3>
+                        {project.titulo}
+                        {project.url_externa && (
+                          <span className="link-icon">🔗</span>
                         )}
-                      </p>
-                    )}
+                      </h3>
+                      <p className="project-description">{project.descricao}</p>
+                      {project.data_inicio && (
+                        <p className="project-date">🗓️ Início: {new Date(project.data_inicio).toLocaleDateString("pt-PT")}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section id="respostas-sociais" className="section">
-        <div className="container">
-          <div className="section-header-editable">
-            <h2>Respostas Sociais</h2>
-            {isEditMode && user && (
-              <button
-                className="btn-add-subsection"
-                onClick={() => handleAddSubsection("respostas-sociais")}
-                title="Adicionar resposta social"
-              >
-                ➥ Adicionar
-              </button>
+                ))}
+              </div>
             )}
           </div>
+        </section>
 
-          {loadingRespostas ? (
-            <p>A carregar respostas sociais...</p>
-          ) : respostasSociais.length === 0 ? (
-            <p>Oferecemos diversos serviços de apoio à comunidade.</p>
-          ) : (
-            <div className="institutional-content">
-              {respostasSociais.map((resposta) => (
-                <div key={resposta.id} className="content-subsection">
-                  <div className="subsection-header">
-                    <h3>{resposta.titulo}</h3>
-                    {isEditMode && user && (
-                      <div className="subsection-actions">
-                        <button
-                          className="btn-edit-inline"
-                          onClick={() =>
-                            handleEdit(
-                              "respostas-sociais",
-                              resposta,
-                              resposta.id
-                            )
-                          }
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-delete-inline"
-                          onClick={() =>
-                            handleDelete(resposta.id, "respostas-sociais")
-                          }
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <p>{resposta.descricao}</p>
-                  {resposta.imagem_destaque && (
-                    <img
-                      src={resposta.imagem_destaque}
-                      alt={resposta.titulo}
-                      className="content-image"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section id="noticias" className="section">
+        <section id="noticias" className="section">
         <div className="container">
           <div className="section-header-editable">
             <h2>Notícias e Eventos</h2>
@@ -500,47 +685,61 @@ const Home = ({ isEditMode = false }) => {
           ) : (
             <div className="institutional-content">
               {noticias.slice(0, 5).map((noticia) => (
-                <div key={noticia.id} className="content-subsection">
-                  <div className="subsection-header">
-                    <h3>{noticia.titulo}</h3>
-                    {isEditMode && user && (
-                      <div className="subsection-actions">
-                        <button
-                          className="btn-edit-inline"
-                          onClick={() =>
-                            handleEdit("noticias", noticia, noticia.id)
-                          }
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-delete-inline"
-                          onClick={() => handleDelete(noticia.id, "noticias")}
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <p>
-                    {noticia.resumo ||
-                      noticia.conteudo?.substring(0, 200) + "..."}
-                  </p>
+                <div
+                  key={noticia.id}
+                  className="content-subsection noticia-item"
+                  onClick={() => openNews(noticia)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && openNews(noticia)}
+                >
                   {noticia.imagem_destaque && (
                     <img
                       src={noticia.imagem_destaque}
                       alt={noticia.titulo}
-                      className="content-image"
+                      className="noticia-image"
+                      onError={(e) => {
+                        console.warn('Imagem não encontrada:', e.target.src);
+                        e.target.src = PLACEHOLDER_SVG;
+                      }}
                     />
                   )}
-                  <p className="project-date">
-                    📅{" "}
-                    {new Date(
-                      noticia.data_publicacao || noticia.created_at
-                    ).toLocaleDateString("pt-PT")}
+
+                  <div className="noticia-body">
+                    <h3 className="noticia-title">{noticia.titulo}</h3>
+                    <p className="noticia-summary">
+                      {noticia.resumo || (stripHtml(noticia.conteudo || "").slice(0, 200) + "...")}
+                    </p>
+                  </div>
+
+                  <p className="noticia-date">
+                    📅 {new Date(noticia.data_publicacao || noticia.created_at).toLocaleDateString("pt-PT")}
                   </p>
+
+                  {isEditMode && user && (
+                    <div className="subsection-actions noticia-actions">
+                      <button
+                        className="btn-edit-inline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit("noticias", noticia, noticia.id);
+                        }}
+                        title="Editar"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="btn-delete-inline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(noticia.id, "noticias");
+                        }}
+                        title="Eliminar"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -579,6 +778,72 @@ const Home = ({ isEditMode = false }) => {
               <strong>Email:</strong> geral@cpslanheses.pt
             </p>
           </div>
+
+          {/* Formulário de contacto público */}
+          {!isEditMode && (
+            <div className="contact-form">
+              <h3>Envie-nos uma mensagem</h3>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const data = {
+                    nome: form.nome.value,
+                    email: form.email.value,
+                    assunto: form.assunto.value,
+                    mensagem: form.mensagem.value,
+                  };
+                  try {
+                    const resp = await api.post('/contactos/form', data);
+                    if (resp.data && resp.data.success) {
+                      alert('Mensagem enviada. Obrigado!');
+                      form.reset();
+                    } else {
+                      alert('Erro ao enviar mensagem.');
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    alert('Erro ao enviar mensagem.');
+                  }
+                }}
+              >
+                <div className="form-row">
+                  <div className="form-field name-field">
+                    <label htmlFor="nome">Nome</label>
+                    <div className="input-with-icon">
+                      <span className="input-icon">👤</span>
+                      <input id="nome" name="nome" placeholder="Nome" required />
+                    </div>
+                  </div>
+
+                  <div className="form-field email-field">
+                    <label htmlFor="email">Email</label>
+                    <div className="input-with-icon">
+                      <span className="input-icon">✉️</span>
+                      <input id="email" name="email" type="email" placeholder="Email" required />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-field subject-field">
+                  <label htmlFor="assunto">Assunto</label>
+                  <div className="input-with-icon">
+                    <span className="input-icon">📝</span>
+                    <input id="assunto" name="assunto" placeholder="Assunto" required />
+                  </div>
+                </div>
+
+                <div className="form-field message-field">
+                  <label htmlFor="mensagem">Mensagem</label>
+                  <textarea id="mensagem" name="mensagem" rows="6" placeholder="Mensagem" required />
+                </div>
+
+                <div className="form-actions" style={{ marginTop: 10 }}>
+                  <button type="submit" className="btn-save">Enviar Mensagem</button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </section>
 
@@ -682,6 +947,39 @@ const Home = ({ isEditMode = false }) => {
               {(editingSection === "respostas-sociais" ||
                 editingSection === "noticias") && (
                 <>
+                  {editingSection === "noticias" && (
+                    <div className="cover-image-upload">
+                      <label>
+                        <strong>Imagem de Capa:</strong>
+                        <div className="cover-preview-row">
+                          {editingData.imagem_destaque ? (
+                            <img
+                              src={editingData.imagem_destaque}
+                              alt="Capa"
+                              className="cover-preview"
+                              onError={(e) => {
+                                    e.target.src = PLACEHOLDER_SVG;
+                                  }}
+                            />
+                          ) : (
+                            <div className="cover-placeholder">Nenhuma imagem de capa</div>
+                          )}
+                          <div className="cover-actions">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const f = e.target.files[0];
+                                if (f) await uploadCoverImage(f);
+                              }}
+                            />
+                            <small className="hint">Enviar imagem de capa (aparece antes do título)</small>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+
                   <label>
                     <strong>Título:</strong>
                     <input
@@ -719,10 +1017,7 @@ const Home = ({ isEditMode = false }) => {
                         <textarea
                           value={editingData.resumo || ""}
                           onChange={(e) =>
-                            setEditingData({
-                              ...editingData,
-                              resumo: e.target.value,
-                            })
+                            setEditingData({ ...editingData, resumo: e.target.value })
                           }
                           rows="3"
                           placeholder="Resumo da notícia"
@@ -730,16 +1025,12 @@ const Home = ({ isEditMode = false }) => {
                       </label>
                       <label>
                         <strong>Conteúdo:</strong>
-                        <textarea
+                        <RichTextEditor
                           value={editingData.conteudo || ""}
-                          onChange={(e) =>
-                            setEditingData({
-                              ...editingData,
-                              conteudo: e.target.value,
-                            })
+                          onChange={(value) =>
+                            setEditingData({ ...editingData, conteudo: value })
                           }
-                          rows="6"
-                          placeholder="Conteúdo completo"
+                          api={api}
                         />
                       </label>
                     </>
@@ -809,6 +1100,68 @@ const Home = ({ isEditMode = false }) => {
         </div>
       )}
 
+      {/* Modal de Visualização da Notícia */}
+      {showNewsModal && selectedNews && (
+        <div className="edit-modal-overlay" onClick={() => setShowNewsModal(false)}>
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <h3>{selectedNews.titulo}</h3>
+              <button className="btn-close" onClick={() => setShowNewsModal(false)}>✕</button>
+            </div>
+            <div className="edit-modal-body">
+              {/* Capa */}
+              {selectedNews.imagem_destaque && (
+                <img
+                  src={selectedNews.imagem_destaque}
+                  alt={selectedNews.titulo}
+                  className="content-image"
+                />
+              )}
+
+              {/* Título -> repetir aqui para colocar depois da capa */}
+              <h3 style={{ marginTop: 12 }}>{selectedNews.titulo}</h3>
+
+              {/* Resumo */}
+              {selectedNews.resumo && (
+                <p className="noticia-summary" style={{ marginTop: 8 }}>{selectedNews.resumo}</p>
+              )}
+
+              {/* Conteúdo HTML */}
+              <div
+                className="noticia-conteudo"
+                dangerouslySetInnerHTML={{ __html: selectedNews.conteudo || "" }}
+              />
+
+              {/* Imagens adicionais associadas (media) */}
+              {selectedNews.media && selectedNews.media.length > 0 && (
+                <div className="noticia-media-gallery">
+                  {selectedNews.media
+                    .filter((m) => m.url !== selectedNews.imagem_destaque && (!m.tipo || m.tipo.includes("imagem")))
+                    .map((m) => (
+                      <img
+                        key={m.id || m.url}
+                        src={m.url}
+                        alt={m.titulo || "imagem"}
+                        className="noticia-additional-image"
+                        onError={(e) => {
+                          console.warn('Imagem adicional não encontrada:', e.target.src);
+                          e.target.src = PLACEHOLDER_SVG;
+                        }}
+                      />
+                    ))}
+                </div>
+              )}
+            </div>
+            <div className="edit-modal-footer" style={{ justifyContent: 'space-between' }}>
+              <div />
+              <div style={{ textAlign: 'right' }}>
+                <small className="project-date">📅 {new Date(selectedNews.data_publicacao || selectedNews.created_at).toLocaleDateString('pt-PT')}</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Adicionar Subseção */}
       {showAddModal && (
         <div
@@ -834,6 +1187,40 @@ const Home = ({ isEditMode = false }) => {
             </div>
             <form onSubmit={handleSaveNew}>
               <div className="edit-modal-body">
+                {/* Cover image for notícias: appear before title */}
+                {editingSection === "noticias" && (
+                  <div className="cover-image-upload">
+                    <label>
+                      <strong>Imagem de Capa:</strong>
+                      <div className="cover-preview-row">
+                        {editingData.imagem_destaque ? (
+                          <img
+                            src={editingData.imagem_destaque}
+                            alt="Capa"
+                            className="cover-preview"
+                            onError={(e) => {
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        ) : (
+                          <div className="cover-placeholder">Nenhuma imagem de capa</div>
+                        )}
+                        <div className="cover-actions">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const f = e.target.files[0];
+                              if (f) await uploadCoverImage(f);
+                            }}
+                          />
+                          <small className="hint">Enviar imagem de capa (aparece antes do título)</small>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
                 <label>
                   <strong>Título:</strong>
                   <input
@@ -861,10 +1248,7 @@ const Home = ({ isEditMode = false }) => {
                       <textarea
                         value={editingData.resumo || ""}
                         onChange={(e) =>
-                          setEditingData({
-                            ...editingData,
-                            resumo: e.target.value,
-                          })
+                          setEditingData({ ...editingData, resumo: e.target.value })
                         }
                         rows="3"
                         placeholder="Breve resumo da notícia"
@@ -872,17 +1256,13 @@ const Home = ({ isEditMode = false }) => {
                     </label>
                     <label>
                       <strong>Conteúdo:</strong>
-                      <textarea
+                      {/* Editor rich-text para conteúdo da notícia */}
+                      <RichTextEditor
                         value={editingData.conteudo || ""}
-                        onChange={(e) =>
-                          setEditingData({
-                            ...editingData,
-                            conteudo: e.target.value,
-                          })
+                        onChange={(value) =>
+                          setEditingData({ ...editingData, conteudo: value })
                         }
-                        rows="6"
-                        required
-                        placeholder="Conteúdo completo da notícia"
+                        api={api}
                       />
                     </label>
                   </>

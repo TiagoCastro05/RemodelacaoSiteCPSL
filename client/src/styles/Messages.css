@@ -1,0 +1,30 @@
+/* Simple styles for messages admin page */
+.messages-page {
+  padding: 20px;
+}
+.messages-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom: 12px;
+}
+.messages-list ul { list-style:none; padding:0; margin:0; }
+.message-item { display:flex; justify-content:space-between; padding:12px; border-bottom:1px solid #eee; }
+.message-item.unread { background:#fff9f9; }
+.message-item.read { background:#fff; }
+.msg-left { cursor:pointer; }
+.msg-name { display:block; }
+.msg-subject { color:#333; }
+.msg-meta { color:#888; font-size:0.9rem; }
+.msg-actions { display:flex; gap:8px; align-items:center; }
+.btn-small { padding:6px 8px; border-radius:6px; border:1px solid #ddd; background:#f7f7f7; cursor:pointer; }
+.btn-delete { background:#ffecec; border-color:#ffb3b3; }
+.btn-refresh { background:#667eea; color: #fff; border: none; padding:8px 12px; border-radius:6px; cursor:pointer; }
+.message-modal { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9999; }
+.message-modal-content { background:white; padding:20px; border-radius:8px; width:90%; max-width:800px; max-height:90vh; overflow:auto; }
+.reply-area textarea { width:100%; margin-top:12px; }
+.reply-actions { display:flex; gap:8px; margin-top:8px; justify-content:flex-end; }
+.btn-save { background:#667eea; color:white; border:none; padding:10px 16px; border-radius:6px; }
+.btn-cancel { background:#f5f5f5; border:1px solid #ddd; padding:8px 12px; border-radius:6px; }
+/* ensure delete button has visible border and pointer */
+.btn-delete { border: 1px solid #ffb3b3; }

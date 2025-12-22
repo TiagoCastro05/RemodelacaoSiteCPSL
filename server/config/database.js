@@ -91,17 +91,12 @@ pool.query = async function (text, params) {
       .replace(/WHERE\s+ativo\s*=\s*TRUE/gi, "WHERE ativo = true")
       .replace(/WHERE\s+ativo\s*=\s*FALSE/gi, "WHERE ativo = false");
 
-    const result = await originalQuery(convertedText, convertedParams);
-
-    // Adicionar RETURNING para INSERTs
+    // If this is an INSERT without RETURNING, execute only once with RETURNING
     if (
       convertedText.trim().toUpperCase().startsWith("INSERT") &&
       !convertedText.toUpperCase().includes("RETURNING")
     ) {
-      // Re-executar com RETURNING
-      const insertQuery = convertedText
-        .trim()
-        .replace(/;?\s*$/, " RETURNING *");
+      const insertQuery = convertedText.trim().replace(/;?\s*$/, " RETURNING *");
       const insertResult = await originalQuery(insertQuery, convertedParams);
       const resultObj = {
         insertId: insertResult.rows[0]?.id || null,
@@ -110,6 +105,8 @@ pool.query = async function (text, params) {
       return [resultObj];
     }
 
+    // For non-insert queries (or inserts that already include RETURNING), execute normally
+    const result = await originalQuery(convertedText, convertedParams);
     // Retornar no formato MySQL: [rows] - garantir que rows existe
     return [result.rows || []];
   } catch (error) {

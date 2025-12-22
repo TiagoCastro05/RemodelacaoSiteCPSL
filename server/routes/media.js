@@ -48,7 +48,9 @@ router.post(
       let tipoMedia = tipo;
 
       if (req.file) {
-        mediaUrl = `/uploads/${req.file.filename}`;
+        const path = require('path');
+        const folder = path.basename(req.file.destination || '');
+        mediaUrl = `/uploads/${folder}/${req.file.filename}`;
         mimeType = req.file.mimetype;
         tamanho = (req.file.size / 1024).toFixed(2) + " KB";
 
@@ -76,10 +78,12 @@ router.post(
         ]
       );
 
+      // result[0] may contain insertId (from wrapper) or full row (depending on driver)
+      const returnedId = result[0]?.insertId || result[0]?.id || null;
       res.status(201).json({
         success: true,
         message: "Media adicionada com sucesso.",
-        data: { id: result[0].id, url: mediaUrl },
+        data: { id: returnedId, url: mediaUrl },
       });
     } catch (error) {
       console.error("Erro ao adicionar media:", error);
