@@ -119,6 +119,7 @@ app.use("/api/transparencia", require("./routes/transparencia"));
 app.use("/api/conteudo", require("./routes/conteudo"));
 app.use("/api/media", require("./routes/media"));
 app.use("/api/mensagens", require("./routes/mensagens"));
+app.use("/api/secoes-personalizadas", require("./routes/secoesPersonalizadas"));
 
 // Rota de teste
 app.get("/api/health", (req, res) => {

@@ -7,6 +7,8 @@ import ProjectsManagement from "./ProjectsManagement";
 import Home from "./Home";
 import Profile from "./Profile";
 import Messages from "./Messages";
+import CustomSectionsManagement from "./CustomSectionsManagement";
+import SectionItemsManagement from "./SectionItemsManagement";
 import "../styles/Dashboard.css";
 
 const Dashboard = () => {
@@ -68,6 +70,12 @@ const Dashboard = () => {
             📁 Gerir Projetos
           </button>
           <button
+            onClick={() => navigate("/dashboard/secoes")}
+            className="btn-admin-action"
+          >
+            ➕ Secções Personalizadas
+          </button>
+          <button
             onClick={() => navigate("/dashboard/mensagens")}
             className="btn-admin-action"
             title="Mensagens"
@@ -98,6 +106,11 @@ const Dashboard = () => {
         <Route path="/" element={<Home isEditMode={true} />} />
         <Route path="/mensagens" element={<Messages />} />
         <Route path="/projetos" element={<ProjectsManagement />} />
+        <Route path="/secoes" element={<CustomSectionsManagement />} />
+        <Route
+          path="/secoes/:secaoId/itens"
+          element={<SectionItemsManagement />}
+        />
         <Route path="/perfil" element={<Profile />} />
         {user?.tipo === "Admin" && (
           <Route path="/utilizadores" element={<Users />} />

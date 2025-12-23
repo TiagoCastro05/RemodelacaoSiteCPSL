@@ -257,6 +257,13 @@ const Home = ({ isEditMode = false }) => {
   const [selectedNews, setSelectedNews] = useState(null);
   const [selectedInstitutional, setSelectedInstitutional] = useState(null);
   const [selectedResposta, setSelectedResposta] = useState(null);
+  const [secoesPersonalizadas, setSecoesPersonalizadas] = useState([]);
+  const [itensSecoesPersonalizadas, setItensSecoesPersonalizadas] = useState(
+    {}
+  );
+  const [loadingSecoes, setLoadingSecoes] = useState(true);
+  const [editingSecaoPersonalizada, setEditingSecaoPersonalizada] =
+    useState(null);
 
   // Upload cover image (imagem_destaque) and set editingData.imagem_destaque
   const uploadCoverImage = async (file) => {
@@ -264,9 +271,14 @@ const Home = ({ isEditMode = false }) => {
       // show placeholder immediately while upload runs
       const placeholderBase =
         api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
+      const imagemField = editingSecaoPersonalizada
+        ? "imagem"
+        : "imagem_destaque";
+
       setEditingData((d) => ({
         ...d,
-        imagem_destaque: `${placeholderBase}${PLACEHOLDER_SVG}`,
+        [imagemField]: `${placeholderBase}${PLACEHOLDER_SVG}`,
       }));
 
       const formData = new FormData();
@@ -274,7 +286,9 @@ const Home = ({ isEditMode = false }) => {
 
       // Determinar tabela de referência baseada na seção
       let tabelaRef = "noticias_eventos";
-      if (editingSection === "respostas-sociais") {
+      if (editingSecaoPersonalizada) {
+        tabelaRef = "itens_secoes_personalizadas";
+      } else if (editingSection === "respostas-sociais") {
         tabelaRef = "respostas_sociais";
       } else if (editingSection !== "noticias") {
         tabelaRef = "conteudo_institucional";
@@ -289,7 +303,7 @@ const Home = ({ isEditMode = false }) => {
       if (!url) throw new Error("Upload não retornou URL");
       const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
       url = url.startsWith("http") ? url : `${base}${url}`;
-      setEditingData((d) => ({ ...d, imagem_destaque: url }));
+      setEditingData((d) => ({ ...d, [imagemField]: url }));
     } catch (err) {
       console.error("Erro ao enviar imagem de capa:", err);
       alert("Erro ao enviar imagem de capa.");
@@ -403,6 +417,38 @@ const Home = ({ isEditMode = false }) => {
     fetchNoticias();
   }, []);
 
+  // Buscar seções personalizadas
+  useEffect(() => {
+    const fetchSecoesPersonalizadas = async () => {
+      try {
+        setLoadingSecoes(true);
+        const response = await api.get("/secoes-personalizadas");
+        if (response.data.success) {
+          const secoes = response.data.data || [];
+          setSecoesPersonalizadas(secoes);
+
+          // Buscar itens de cada seção
+          const itensMap = {};
+          for (const secao of secoes) {
+            const itensResp = await api.get(
+              `/secoes-personalizadas/${secao.id}/itens`
+            );
+            if (itensResp.data.success) {
+              itensMap[secao.id] = itensResp.data.data || [];
+            }
+          }
+          setItensSecoesPersonalizadas(itensMap);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar seções personalizadas:", error);
+      } finally {
+        setLoadingSecoes(false);
+      }
+    };
+
+    fetchSecoesPersonalizadas();
+  }, []);
+
   // Abrir modal de edição
   const handleEdit = (section, data = {}, id = null) => {
     setEditingSection(section);
@@ -412,10 +458,17 @@ const Home = ({ isEditMode = false }) => {
   };
 
   // Adicionar nova subseção
-  const handleAddSubsection = (section = "instituicao") => {
+  const handleAddSubsection = (
+    section = "instituicao",
+    secaoPersonalizadaData = null
+  ) => {
     console.log("handleAddSubsection - section:", section);
     setEditingSection(section);
-    if (section === "respostas-sociais") {
+
+    if (secaoPersonalizadaData) {
+      setEditingSecaoPersonalizada(secaoPersonalizadaData);
+      setEditingData({ titulo: "", subtitulo: "", conteudo: "", imagem: "" });
+    } else if (section === "respostas-sociais") {
       setEditingData({
         titulo: "",
         descricao: "",
@@ -447,7 +500,26 @@ const Home = ({ isEditMode = false }) => {
     e.preventDefault();
     try {
       let response;
-      if (editingSection === "respostas-sociais") {
+
+      if (editingSecaoPersonalizada) {
+        // Criar item de seção personalizada
+        response = await api.post(
+          `/secoes-personalizadas/${editingSecaoPersonalizada.id}/itens`,
+          editingData
+        );
+        if (response.data.success) {
+          // Atualizar lista de itens da seção
+          setItensSecoesPersonalizadas({
+            ...itensSecoesPersonalizadas,
+            [editingSecaoPersonalizada.id]: [
+              ...(itensSecoesPersonalizadas[editingSecaoPersonalizada.id] ||
+                []),
+              response.data.data,
+            ],
+          });
+        }
+        setEditingSecaoPersonalizada(null);
+      } else if (editingSection === "respostas-sociais") {
         response = await api.post("/respostas-sociais", editingData);
         if (response.data.success) {
           setRespostasSociais([...respostasSociais, response.data.data]);
@@ -580,7 +652,11 @@ const Home = ({ isEditMode = false }) => {
 
   return (
     <div className="home-page">
-      <Header sections={sections} isEditMode={isEditMode} />
+      <Header
+        sections={sections}
+        customSections={secoesPersonalizadas}
+        isEditMode={isEditMode}
+      />
 
       <section className="hero-section">
         <div className="container">
@@ -976,6 +1052,110 @@ const Home = ({ isEditMode = false }) => {
           )}
         </div>
       </section>
+
+      {/* Seções Personalizadas */}
+      {secoesPersonalizadas.map((secao) => {
+        const itens = itensSecoesPersonalizadas[secao.id] || [];
+
+        return (
+          <section key={secao.id} id={secao.slug} className="section">
+            <div className="container">
+              <div className="section-header-editable">
+                <h2>
+                  {secao.icone} {secao.titulo}
+                </h2>
+                {isEditMode && user && (
+                  <button
+                    className="btn-add-subsection"
+                    onClick={() =>
+                      handleAddSubsection("secao-personalizada", secao)
+                    }
+                    title="Adicionar item"
+                  >
+                    ➥ Adicionar
+                  </button>
+                )}
+              </div>
+
+              {secao.descricao && (
+                <p style={{ marginBottom: "2rem", color: "#666" }}>
+                  {secao.descricao}
+                </p>
+              )}
+
+              {loadingSecoes ? (
+                <p>A carregar...</p>
+              ) : itens.length === 0 ? (
+                <p>Nenhum conteúdo adicionado ainda.</p>
+              ) : (
+                <div
+                  className={`institutional-content ${
+                    secao.tipo_layout === "galeria" ? "gallery-grid" : ""
+                  }`}
+                >
+                  {itens.map((item) => (
+                    <div
+                      key={item.id}
+                      className="content-subsection"
+                      onClick={() =>
+                        !isEditMode && item.link_externo
+                          ? window.open(item.link_externo, "_blank")
+                          : null
+                      }
+                      style={{
+                        cursor:
+                          !isEditMode && item.link_externo
+                            ? "pointer"
+                            : "default",
+                      }}
+                    >
+                      {item.imagem && (
+                        <img
+                          src={item.imagem}
+                          alt={item.titulo}
+                          className="content-image"
+                          style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                        />
+                      )}
+                      {item.titulo && <h3>{item.titulo}</h3>}
+                      {item.subtitulo && (
+                        <p
+                          style={{
+                            fontStyle: "italic",
+                            color: "#666",
+                            marginTop: "0.5rem",
+                          }}
+                        >
+                          {item.subtitulo}
+                        </p>
+                      )}
+                      {item.conteudo && (
+                        <div
+                          className="content-preview"
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              item.conteudo.substring(0, 200) +
+                              (item.conteudo.length > 200 ? "..." : ""),
+                          }}
+                        />
+                      )}
+                      {item.video_url && (
+                        <video
+                          controls
+                          className="content-video"
+                          style={{ marginTop: "1rem", maxWidth: "100%" }}
+                        >
+                          <source src={item.video_url} type="video/mp4" />
+                        </video>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })}
 
       <section id="contactos" className="section">
         <div className="container">
@@ -1636,7 +1816,9 @@ const Home = ({ isEditMode = false }) => {
             <div className="edit-modal-header">
               <h3>
                 Adicionar{" "}
-                {editingSection === "respostas-sociais"
+                {editingSecaoPersonalizada
+                  ? `Item - ${editingSecaoPersonalizada.titulo}`
+                  : editingSection === "respostas-sociais"
                   ? "Resposta Social"
                   : editingSection === "noticias"
                   ? "Notícia"
@@ -1658,9 +1840,17 @@ const Home = ({ isEditMode = false }) => {
                       <label>
                         <strong>Imagem de Capa:</strong>
                         <div className="cover-preview-row">
-                          {editingData.imagem_destaque ? (
+                          {(
+                            editingSecaoPersonalizada
+                              ? editingData.imagem
+                              : editingData.imagem_destaque
+                          ) ? (
                             <img
-                              src={editingData.imagem_destaque}
+                              src={
+                                editingSecaoPersonalizada
+                                  ? editingData.imagem
+                                  : editingData.imagem_destaque
+                              }
                               alt="Capa"
                               className="cover-preview"
                               onError={(e) => {

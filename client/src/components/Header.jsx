@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "../styles/Header.css";
 
-const Header = ({ sections = [], isEditMode = false }) => {
+const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -13,10 +13,19 @@ const Header = ({ sections = [], isEditMode = false }) => {
     { id: "projetos", label: "Projetos" },
     { id: "respostas-sociais", label: "Respostas Sociais" },
     { id: "noticias", label: "Notícias" },
-    { id: "contactos", label: "Contactos" },
   ];
 
-  const menuSections = sections.length > 0 ? sections : defaultSections;
+  // Combinar seções padrão com personalizadas (antes dos contactos)
+  const secoesPersonalizadasMenu = customSections.map((secao) => ({
+    id: secao.slug,
+    label: `${secao.icone || ""} ${secao.titulo}`.trim(),
+  }));
+
+  const menuSections = [
+    ...(sections.length > 0 ? sections : defaultSections),
+    ...secoesPersonalizadasMenu,
+    { id: "contactos", label: "Contactos" },
+  ];
 
   // Detectar scroll para adicionar efeito ao header
   useEffect(() => {
