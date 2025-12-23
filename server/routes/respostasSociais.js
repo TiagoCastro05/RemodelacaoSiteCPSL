@@ -49,6 +49,7 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       titulo,
       subtitulo,
       descricao,
+      conteudo,
       objetivos,
       servicos_prestados,
       capacidade,
@@ -59,12 +60,13 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
     } = req.body;
 
     const [result] = await pool.query(
-      `INSERT INTO respostas_sociais (titulo, subtitulo, descricao, objetivos, servicos_prestados, capacidade, horario, imagem_destaque, ativo, ordem, criado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      `INSERT INTO respostas_sociais (titulo, subtitulo, descricao, conteudo, objetivos, servicos_prestados, capacidade, horario, imagem_destaque, ativo, ordem, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [
         titulo,
         subtitulo || null,
         descricao,
+        conteudo || null,
         objetivos || null,
         servicos_prestados || null,
         capacidade || null,
@@ -93,6 +95,7 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       "titulo",
       "subtitulo",
       "descricao",
+      "conteudo",
       "objetivos",
       "servicos_prestados",
       "capacidade",

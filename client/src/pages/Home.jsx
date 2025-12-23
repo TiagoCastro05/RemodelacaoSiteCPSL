@@ -255,6 +255,8 @@ const Home = ({ isEditMode = false }) => {
   const { user } = useContext(AuthContext);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [selectedNews, setSelectedNews] = useState(null);
+  const [selectedInstitutional, setSelectedInstitutional] = useState(null);
+  const [selectedResposta, setSelectedResposta] = useState(null);
 
   // Upload cover image (imagem_destaque) and set editingData.imagem_destaque
   const uploadCoverImage = async (file) => {
@@ -269,7 +271,16 @@ const Home = ({ isEditMode = false }) => {
 
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("tabela_referencia", "noticias_eventos");
+
+      // Determinar tabela de referência baseada na seção
+      let tabelaRef = "noticias_eventos";
+      if (editingSection === "respostas-sociais") {
+        tabelaRef = "respostas_sociais";
+      } else if (editingSection !== "noticias") {
+        tabelaRef = "conteudo_institucional";
+      }
+
+      formData.append("tabela_referencia", tabelaRef);
       // id_referencia could be null for now
       const response = await api.post("/media", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -405,11 +416,27 @@ const Home = ({ isEditMode = false }) => {
     console.log("handleAddSubsection - section:", section);
     setEditingSection(section);
     if (section === "respostas-sociais") {
-      setEditingData({ titulo: "", descricao: "" });
+      setEditingData({
+        titulo: "",
+        descricao: "",
+        conteudo: "",
+        imagem_destaque: "",
+      });
     } else if (section === "noticias") {
-      setEditingData({ titulo: "", resumo: "", conteudo: "", tipo: "noticia" });
+      setEditingData({
+        titulo: "",
+        resumo: "",
+        conteudo: "",
+        tipo: "noticia",
+        imagem_destaque: "",
+      });
     } else {
-      setEditingData({ titulo: "", conteudo: "" });
+      setEditingData({
+        titulo: "",
+        resumo: "",
+        conteudo: "",
+        imagem_destaque: "",
+      });
     }
     setEditingId(null);
     setShowAddModal(true);
@@ -607,25 +634,41 @@ const Home = ({ isEditMode = false }) => {
           ) : (
             <div className="institutional-content">
               {conteudoInstitucional.map((content) => (
-                <div key={content.id} className="content-subsection">
+                <div
+                  key={content.id}
+                  className="content-subsection"
+                  onClick={() =>
+                    !isEditMode && setSelectedInstitutional(content)
+                  }
+                  style={{ cursor: !isEditMode ? "pointer" : "default" }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) =>
+                    !isEditMode &&
+                    e.key === "Enter" &&
+                    setSelectedInstitutional(content)
+                  }
+                >
                   <div className="subsection-header">
                     <h3>{content.titulo}</h3>
                     {isEditMode && user && (
                       <div className="subsection-actions">
                         <button
                           className="btn-edit-inline"
-                          onClick={() =>
-                            handleEdit("institucional", content, content.id)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit("institucional", content, content.id);
+                          }}
                           title="Editar"
                         >
                           ✏️
                         </button>
                         <button
                           className="btn-delete-inline"
-                          onClick={() =>
-                            handleDelete(content.id, "instituicao")
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(content.id, "instituicao");
+                          }}
                           title="Eliminar"
                         >
                           🗑️
@@ -633,14 +676,30 @@ const Home = ({ isEditMode = false }) => {
                       </div>
                     )}
                   </div>
-                  <p>{content.conteudo}</p>
-                  {content.imagem_url && (
+                  {content.imagem && (
                     <img
-                      src={content.imagem_url}
+                      src={content.imagem}
                       alt={content.titulo}
                       className="content-image"
+                      style={{ marginBottom: "1rem", maxWidth: "100%" }}
                     />
                   )}
+                  {content.subtitulo && (
+                    <p
+                      className="content-summary"
+                      style={{ fontStyle: "italic", marginTop: 8 }}
+                    >
+                      {content.subtitulo}
+                    </p>
+                  )}
+                  <div
+                    className="content-preview"
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        (content.conteudo || "").substring(0, 200) +
+                        (content.conteudo?.length > 200 ? "..." : ""),
+                    }}
+                  />
                   {content.video_url && (
                     <video controls className="content-video">
                       <source src={content.video_url} type="video/mp4" />
@@ -748,29 +807,43 @@ const Home = ({ isEditMode = false }) => {
           ) : (
             <div className="institutional-content">
               {respostasSociais.map((resposta) => (
-                <div key={resposta.id} className="content-subsection">
+                <div
+                  key={resposta.id}
+                  className="content-subsection"
+                  onClick={() => !isEditMode && setSelectedResposta(resposta)}
+                  style={{ cursor: !isEditMode ? "pointer" : "default" }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) =>
+                    !isEditMode &&
+                    e.key === "Enter" &&
+                    setSelectedResposta(resposta)
+                  }
+                >
                   <div className="subsection-header">
                     <h3>{resposta.titulo}</h3>
                     {isEditMode && user && (
                       <div className="subsection-actions">
                         <button
                           className="btn-edit-inline"
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleEdit(
                               "respostas-sociais",
                               resposta,
                               resposta.id
-                            )
-                          }
+                            );
+                          }}
                           title="Editar"
                         >
                           ✏️
                         </button>
                         <button
                           className="btn-delete-inline"
-                          onClick={() =>
-                            handleDelete(resposta.id, "respostas-sociais")
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(resposta.id, "respostas-sociais");
+                          }}
                           title="Eliminar"
                         >
                           🗑️
@@ -778,14 +851,37 @@ const Home = ({ isEditMode = false }) => {
                       </div>
                     )}
                   </div>
-                  <p>{resposta.descricao}</p>
                   {resposta.imagem_destaque && (
                     <img
                       src={resposta.imagem_destaque}
                       alt={resposta.titulo}
                       className="content-image"
+                      style={{ marginBottom: "1rem", maxWidth: "100%" }}
                     />
                   )}
+                  {resposta.descricao && (
+                    <p
+                      className="content-summary"
+                      style={{ fontStyle: "italic", marginTop: 8 }}
+                    >
+                      {resposta.descricao}
+                    </p>
+                  )}
+                  <div
+                    className="content-preview"
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        (
+                          resposta.conteudo ||
+                          resposta.descricao ||
+                          ""
+                        ).substring(0, 200) +
+                        ((resposta.conteudo || resposta.descricao || "")
+                          .length > 200
+                          ? "..."
+                          : ""),
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -1038,6 +1134,74 @@ const Home = ({ isEditMode = false }) => {
             <div className="edit-modal-body">
               {editingSection === "institucional" && (
                 <>
+                  <div className="cover-image-upload">
+                    <label>
+                      <strong>Imagem de Capa:</strong>
+                      <div className="cover-preview-row">
+                        {editingData.imagem ? (
+                          <img
+                            src={editingData.imagem}
+                            alt="Capa"
+                            className="cover-preview"
+                            onError={(e) => {
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        ) : (
+                          <div className="cover-placeholder">
+                            Nenhuma imagem de capa
+                          </div>
+                        )}
+                        <div className="cover-actions">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const f = e.target.files[0];
+                              if (f) {
+                                try {
+                                  const formData = new FormData();
+                                  formData.append("file", f);
+                                  formData.append(
+                                    "tabela_referencia",
+                                    "conteudo_institucional"
+                                  );
+                                  const response = await api.post(
+                                    "/media",
+                                    formData,
+                                    {
+                                      headers: {
+                                        "Content-Type": "multipart/form-data",
+                                      },
+                                    }
+                                  );
+                                  let url = response.data?.data?.url;
+                                  if (url) {
+                                    const base =
+                                      api.defaults.baseURL?.replace(
+                                        /\/api\/?$/,
+                                        ""
+                                      ) || "";
+                                    url = url.startsWith("http")
+                                      ? url
+                                      : `${base}${url}`;
+                                    setEditingData((d) => ({
+                                      ...d,
+                                      imagem: url,
+                                    }));
+                                  }
+                                } catch (err) {
+                                  console.error("Erro ao enviar imagem:", err);
+                                  alert("Erro ao enviar imagem.");
+                                }
+                              }
+                            }}
+                          />
+                          <small className="hint">Enviar imagem de capa</small>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                   <label>
                     <strong>Título:</strong>
                     <input
@@ -1053,17 +1217,27 @@ const Home = ({ isEditMode = false }) => {
                     />
                   </label>
                   <label>
-                    <strong>Texto:</strong>
+                    <strong>Resumo/Descrição Breve:</strong>
                     <textarea
-                      value={editingData.conteudo || ""}
+                      value={editingData.subtitulo || ""}
                       onChange={(e) =>
                         setEditingData({
                           ...editingData,
-                          conteudo: e.target.value,
+                          subtitulo: e.target.value,
                         })
                       }
-                      rows="6"
-                      placeholder="Texto institucional"
+                      rows="2"
+                      placeholder="Descrição breve"
+                    />
+                  </label>
+                  <label>
+                    <strong>Conteúdo:</strong>
+                    <RichTextEditor
+                      value={editingData.conteudo || ""}
+                      onChange={(value) =>
+                        setEditingData({ ...editingData, conteudo: value })
+                      }
+                      api={api}
                     />
                   </label>
                 </>
@@ -1105,42 +1279,38 @@ const Home = ({ isEditMode = false }) => {
               {(editingSection === "respostas-sociais" ||
                 editingSection === "noticias") && (
                 <>
-                  {editingSection === "noticias" && (
-                    <div className="cover-image-upload">
-                      <label>
-                        <strong>Imagem de Capa:</strong>
-                        <div className="cover-preview-row">
-                          {editingData.imagem_destaque ? (
-                            <img
-                              src={editingData.imagem_destaque}
-                              alt="Capa"
-                              className="cover-preview"
-                              onError={(e) => {
-                                e.target.src = PLACEHOLDER_SVG;
-                              }}
-                            />
-                          ) : (
-                            <div className="cover-placeholder">
-                              Nenhuma imagem de capa
-                            </div>
-                          )}
-                          <div className="cover-actions">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const f = e.target.files[0];
-                                if (f) await uploadCoverImage(f);
-                              }}
-                            />
-                            <small className="hint">
-                              Enviar imagem de capa (aparece antes do título)
-                            </small>
+                  <div className="cover-image-upload">
+                    <label>
+                      <strong>Imagem de Capa:</strong>
+                      <div className="cover-preview-row">
+                        {editingData.imagem_destaque ? (
+                          <img
+                            src={editingData.imagem_destaque}
+                            alt="Capa"
+                            className="cover-preview"
+                            onError={(e) => {
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        ) : (
+                          <div className="cover-placeholder">
+                            Nenhuma imagem de capa
                           </div>
+                        )}
+                        <div className="cover-actions">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const f = e.target.files[0];
+                              if (f) await uploadCoverImage(f);
+                            }}
+                          />
+                          <small className="hint">Enviar imagem de capa</small>
                         </div>
-                      </label>
-                    </div>
-                  )}
+                      </div>
+                    </label>
+                  </div>
 
                   <label>
                     <strong>Título:</strong>
@@ -1156,50 +1326,47 @@ const Home = ({ isEditMode = false }) => {
                       placeholder="Título"
                     />
                   </label>
-                  {editingSection === "respostas-sociais" && (
-                    <label>
-                      <strong>Descrição:</strong>
-                      <textarea
-                        value={editingData.descricao || ""}
-                        onChange={(e) =>
-                          setEditingData({
-                            ...editingData,
-                            descricao: e.target.value,
-                          })
-                        }
-                        rows="6"
-                        placeholder="Descrição da resposta social"
-                      />
-                    </label>
-                  )}
-                  {editingSection === "noticias" && (
-                    <>
-                      <label>
-                        <strong>Resumo:</strong>
-                        <textarea
-                          value={editingData.resumo || ""}
-                          onChange={(e) =>
-                            setEditingData({
-                              ...editingData,
-                              resumo: e.target.value,
-                            })
-                          }
-                          rows="3"
-                          placeholder="Resumo da notícia"
-                        />
-                      </label>
-                      <label>
-                        <strong>Conteúdo:</strong>
-                        <RichTextEditor
-                          value={editingData.conteudo || ""}
-                          onChange={(value) =>
-                            setEditingData({ ...editingData, conteudo: value })
-                          }
-                          api={api}
-                        />
-                      </label>
-                    </>
-                  )}
+
+                  <label>
+                    <strong>
+                      {editingSection === "noticias"
+                        ? "Resumo:"
+                        : "Descrição Breve:"}
+                      :
+                    </strong>
+                    <textarea
+                      value={
+                        editingSection === "respostas-sociais"
+                          ? editingData.descricao || ""
+                          : editingData.resumo || ""
+                      }
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          [editingSection === "respostas-sociais"
+                            ? "descricao"
+                            : "resumo"]: e.target.value,
+                        })
+                      }
+                      rows="3"
+                      placeholder={
+                        editingSection === "noticias"
+                          ? "Resumo da notícia"
+                          : "Descrição breve da resposta social"
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    <strong>Conteúdo:</strong>
+                    <RichTextEditor
+                      value={editingData.conteudo || ""}
+                      onChange={(value) =>
+                        setEditingData({ ...editingData, conteudo: value })
+                      }
+                      api={api}
+                    />
+                  </label>
                 </>
               )}
 
@@ -1354,6 +1521,111 @@ const Home = ({ isEditMode = false }) => {
         </div>
       )}
 
+      {/* Modal Conteúdo Institucional */}
+      {selectedInstitutional && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setSelectedInstitutional(null)}
+        >
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <h3>{selectedInstitutional.titulo}</h3>
+              <button
+                className="btn-close"
+                onClick={() => setSelectedInstitutional(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="edit-modal-body">
+              {selectedInstitutional.imagem && (
+                <img
+                  src={selectedInstitutional.imagem}
+                  alt={selectedInstitutional.titulo}
+                  className="content-image"
+                  style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                />
+              )}
+              <h3 style={{ marginTop: 12 }}>{selectedInstitutional.titulo}</h3>
+              {selectedInstitutional.subtitulo && (
+                <p
+                  className="noticia-summary"
+                  style={{ marginTop: 8, fontStyle: "italic" }}
+                >
+                  {selectedInstitutional.subtitulo}
+                </p>
+              )}
+              <div
+                className="noticia-conteudo"
+                dangerouslySetInnerHTML={{
+                  __html: selectedInstitutional.conteudo || "",
+                }}
+              />
+              {selectedInstitutional.video_url && (
+                <video
+                  controls
+                  className="content-video"
+                  style={{ marginTop: "1rem", maxWidth: "100%" }}
+                >
+                  <source
+                    src={selectedInstitutional.video_url}
+                    type="video/mp4"
+                  />
+                </video>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Resposta Social */}
+      {selectedResposta && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setSelectedResposta(null)}
+        >
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="edit-modal-header">
+              <h3>{selectedResposta.titulo}</h3>
+              <button
+                className="btn-close"
+                onClick={() => setSelectedResposta(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="edit-modal-body">
+              {selectedResposta.imagem_destaque && (
+                <img
+                  src={selectedResposta.imagem_destaque}
+                  alt={selectedResposta.titulo}
+                  className="content-image"
+                  style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                />
+              )}
+              <h3 style={{ marginTop: 12 }}>{selectedResposta.titulo}</h3>
+              {selectedResposta.descricao && (
+                <p
+                  className="noticia-summary"
+                  style={{ marginTop: 8, fontStyle: "italic" }}
+                >
+                  {selectedResposta.descricao}
+                </p>
+              )}
+              <div
+                className="noticia-conteudo"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    selectedResposta.conteudo ||
+                    selectedResposta.descricao ||
+                    "",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Adicionar Subseção */}
       {showAddModal && (
         <div
@@ -1379,43 +1651,44 @@ const Home = ({ isEditMode = false }) => {
             </div>
             <form onSubmit={handleSaveNew}>
               <div className="edit-modal-body">
-                {/* Cover image for notícias: appear before title */}
-                {editingSection === "noticias" && (
-                  <div className="cover-image-upload">
-                    <label>
-                      <strong>Imagem de Capa:</strong>
-                      <div className="cover-preview-row">
-                        {editingData.imagem_destaque ? (
-                          <img
-                            src={editingData.imagem_destaque}
-                            alt="Capa"
-                            className="cover-preview"
-                            onError={(e) => {
-                              e.target.src = PLACEHOLDER_SVG;
-                            }}
-                          />
-                        ) : (
-                          <div className="cover-placeholder">
-                            Nenhuma imagem de capa
+                {/* Cover image - para todas as seções exceto contactos */}
+                {editingSection !== "contactos" &&
+                  editingSection !== "projetos" && (
+                    <div className="cover-image-upload">
+                      <label>
+                        <strong>Imagem de Capa:</strong>
+                        <div className="cover-preview-row">
+                          {editingData.imagem_destaque ? (
+                            <img
+                              src={editingData.imagem_destaque}
+                              alt="Capa"
+                              className="cover-preview"
+                              onError={(e) => {
+                                e.target.src = PLACEHOLDER_SVG;
+                              }}
+                            />
+                          ) : (
+                            <div className="cover-placeholder">
+                              Nenhuma imagem de capa
+                            </div>
+                          )}
+                          <div className="cover-actions">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const f = e.target.files[0];
+                                if (f) await uploadCoverImage(f);
+                              }}
+                            />
+                            <small className="hint">
+                              Enviar imagem de capa (aparece antes do título)
+                            </small>
                           </div>
-                        )}
-                        <div className="cover-actions">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const f = e.target.files[0];
-                              if (f) await uploadCoverImage(f);
-                            }}
-                          />
-                          <small className="hint">
-                            Enviar imagem de capa (aparece antes do título)
-                          </small>
                         </div>
-                      </div>
-                    </label>
-                  </div>
-                )}
+                      </label>
+                    </div>
+                  )}
 
                 <label>
                   <strong>Título:</strong>
@@ -1436,72 +1709,52 @@ const Home = ({ isEditMode = false }) => {
                   />
                 </label>
 
-                {/* Notícias */}
-                {editingSection === "noticias" && (
-                  <>
+                {/* Resumo/Descrição - para todas as seções */}
+                {editingSection !== "contactos" &&
+                  editingSection !== "projetos" && (
                     <label>
-                      <strong>Resumo:</strong>
+                      <strong>
+                        {editingSection === "noticias"
+                          ? "Resumo:"
+                          : "Descrição Breve:"}
+                      </strong>
                       <textarea
-                        value={editingData.resumo || ""}
+                        value={
+                          editingSection === "respostas-sociais"
+                            ? editingData.descricao || ""
+                            : editingData.resumo || ""
+                        }
                         onChange={(e) =>
                           setEditingData({
                             ...editingData,
-                            resumo: e.target.value,
+                            [editingSection === "respostas-sociais"
+                              ? "descricao"
+                              : "resumo"]: e.target.value,
                           })
                         }
                         rows="3"
-                        placeholder="Breve resumo da notícia"
+                        placeholder={
+                          editingSection === "noticias"
+                            ? "Breve resumo da notícia"
+                            : editingSection === "respostas-sociais"
+                            ? "Breve descrição da resposta social"
+                            : "Breve descrição"
+                        }
                       />
                     </label>
+                  )}
+
+                {/* Conteúdo com Rich Text Editor - para todas as seções */}
+                {editingSection !== "contactos" &&
+                  editingSection !== "projetos" && (
                     <label>
                       <strong>Conteúdo:</strong>
-                      {/* Editor rich-text para conteúdo da notícia */}
                       <RichTextEditor
                         value={editingData.conteudo || ""}
                         onChange={(value) =>
                           setEditingData({ ...editingData, conteudo: value })
                         }
                         api={api}
-                      />
-                    </label>
-                  </>
-                )}
-
-                {/* Respostas Sociais */}
-                {editingSection === "respostas-sociais" && (
-                  <label>
-                    <strong>Descrição:</strong>
-                    <textarea
-                      value={editingData.descricao || ""}
-                      onChange={(e) =>
-                        setEditingData({
-                          ...editingData,
-                          descricao: e.target.value,
-                        })
-                      }
-                      rows="6"
-                      required
-                      placeholder="Descrição da resposta social"
-                    />
-                  </label>
-                )}
-
-                {/* Instituição - Sempre mostrar se não for notícias nem respostas sociais */}
-                {editingSection !== "noticias" &&
-                  editingSection !== "respostas-sociais" && (
-                    <label>
-                      <strong>Descrição:</strong>
-                      <textarea
-                        value={editingData.conteudo || ""}
-                        onChange={(e) =>
-                          setEditingData({
-                            ...editingData,
-                            conteudo: e.target.value,
-                          })
-                        }
-                        rows="6"
-                        required
-                        placeholder="Conteúdo da subseção institucional"
                       />
                     </label>
                   )}

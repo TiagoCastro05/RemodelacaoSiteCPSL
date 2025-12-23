@@ -34,13 +34,18 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       titulo,
       texto,
       conteudo,
+      resumo,
       secao = "instituicao",
       imagem_url,
+      imagem_destaque,
       video_url,
     } = req.body;
 
     // Suportar tanto 'texto' quanto 'conteudo'
     const conteudoFinal = conteudo || texto;
+
+    // Suportar tanto 'imagem_url' quanto 'imagem_destaque'
+    const imagemFinal = imagem_destaque || imagem_url;
 
     console.log("Validação - titulo:", titulo, "conteudoFinal:", conteudoFinal);
 
@@ -67,9 +72,9 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       [
         secao,
         titulo,
-        "",
+        resumo || "",
         conteudoFinal,
-        imagem_url || null,
+        imagemFinal || null,
         video_url || null,
         ordem,
         req.user.id,

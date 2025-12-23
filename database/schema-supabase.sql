@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS respostas_sociais (
     titulo VARCHAR(200) NOT NULL,
     subtitulo VARCHAR(300),
     descricao TEXT,
+    conteudo TEXT,
     objetivos TEXT,
     servicos_prestados TEXT,
     capacidade VARCHAR(100),
@@ -137,6 +138,53 @@ CREATE TABLE IF NOT EXISTS transparencia (
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela de Seções Personalizadas (para criar seções customizadas dinamicamente)
+CREATE TABLE IF NOT EXISTS secoes_personalizadas (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    titulo VARCHAR(200) NOT NULL,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    descricao TEXT,
+    icone VARCHAR(50),
+    ordem INTEGER DEFAULT 0,
+    ativo BOOLEAN DEFAULT true,
+    tipo_layout VARCHAR(50) DEFAULT 'cards', -- 'cards', 'lista', 'galeria', 'texto', 'formulario'
+    tem_formulario BOOLEAN DEFAULT false, -- Se TRUE, a seção inclui um formulário
+    config_formulario JSONB, -- Configuração do formulário (campos, labels, placeholders)
+    criado_por INTEGER,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de Itens das Seções Personalizadas
+CREATE TABLE IF NOT EXISTS itens_secoes_personalizadas (
+    id SERIAL PRIMARY KEY,
+    secao_id INTEGER NOT NULL REFERENCES secoes_personalizadas(id) ON DELETE CASCADE,
+    titulo VARCHAR(300),
+    subtitulo VARCHAR(500),
+    conteudo TEXT,
+    imagem VARCHAR(500),
+    video_url VARCHAR(500),
+    link_externo VARCHAR(500),
+    ordem INTEGER DEFAULT 0,
+    ativo BOOLEAN DEFAULT true,
+    criado_por INTEGER,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de Submissões de Formulários das Seções Personalizadas
+CREATE TABLE IF NOT EXISTS submissoes_formularios_secoes (
+    id SERIAL PRIMARY KEY,
+    secao_id INTEGER NOT NULL REFERENCES secoes_personalizadas(id) ON DELETE CASCADE,
+    dados JSONB NOT NULL, -- Armazena todos os campos do formulário de forma flexível
+    respondido BOOLEAN DEFAULT false,
+    resposta TEXT,
+    respondido_por INTEGER,
+    data_resposta TIMESTAMP,
+    data_submissao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Criar índices para performance
 CREATE INDEX idx_projetos_ativo ON projetos(ativo);
 CREATE INDEX idx_respostas_sociais_ativo ON respostas_sociais(ativo);
@@ -145,6 +193,9 @@ CREATE INDEX idx_noticias_data ON noticias_eventos(data_publicacao);
 CREATE INDEX idx_media_referencia ON media(tabela_referencia, id_referencia);
 CREATE INDEX idx_form_contacto_respondido ON form_contacto(respondido);
 CREATE INDEX idx_transparencia_ano ON transparencia(ano);
+CREATE INDEX idx_secoes_ativas ON secoes_personalizadas(ativo, ordem);
+CREATE INDEX idx_itens_secao ON itens_secoes_personalizadas(secao_id, ativo, ordem);
+CREATE INDEX idx_submissoes_secao ON submissoes_formularios_secoes(secao_id, respondido);
 
 -- Inserir usuário admin padrão
 -- Email: admin@cpslanheses.pt | Password: Admin123!
