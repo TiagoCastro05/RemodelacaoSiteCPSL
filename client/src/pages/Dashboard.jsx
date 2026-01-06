@@ -9,6 +9,7 @@ import Profile from "./Profile";
 import Messages from "./Messages";
 import CustomSectionsManagement from "./CustomSectionsManagement";
 import SectionItemsManagement from "./SectionItemsManagement";
+import TransparencyManagement from "./TransparencyManagement";
 import "../styles/Dashboard.css";
 
 const Dashboard = () => {
@@ -111,6 +112,7 @@ const Dashboard = () => {
           path="/secoes/:secaoId/itens"
           element={<SectionItemsManagement />}
         />
+        <Route path="/transparencia" element={<TransparencyManagement />} />
         <Route path="/perfil" element={<Profile />} />
         {user?.tipo === "Admin" && (
           <Route path="/utilizadores" element={<Users />} />

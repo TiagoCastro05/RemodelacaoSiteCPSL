@@ -8,7 +8,7 @@ const upload = require("../middleware/upload");
 router.get("/", async (req, res) => {
   try {
     const { ano, tipo } = req.query;
-    let query = "SELECT * FROM transparencia";
+  let query = "SELECT * FROM transparencia";
     const params = [];
     const conditions = [];
     let paramIndex = 1;
@@ -31,6 +31,7 @@ router.get("/", async (req, res) => {
     const [documentos] = await pool.query(query, params);
     res.json({ success: true, data: documentos });
   } catch (error) {
+    console.error("[transparencia] GET error", error);
     res.status(500).json({ success: false, message: "Erro no servidor." });
   }
 });
@@ -43,14 +44,33 @@ router.post(
     try {
       const { titulo, descricao, ano, tipo } = req.body;
 
+      const allowedTipos = [
+        "Relatorio",
+        "Contas",
+        "Relatorio_Atividades",
+        "Outro",
+      ];
+
+      const normalizedTipo =
+        tipo === "Relatorio_Contas" ? "Relatorio" : tipo;
+
+      const safeTipo = allowedTipos.includes(normalizedTipo)
+        ? normalizedTipo
+        : "Relatorio";
+
       if (!req.file) {
         return res
           .status(400)
           .json({ success: false, message: "Ficheiro é obrigatório." });
       }
 
-      const ficheiro_url = `/uploads/${req.file.filename}`;
-      const tamanho = (req.file.size / 1024).toFixed(2) + " KB";
+      const filePath = req.file.path || req.file.secure_url || "";
+      const ficheiro_url = filePath.startsWith("http")
+        ? filePath
+        : `/uploads/${req.file.filename}`;
+      const tamanho = req.file.size
+        ? (req.file.size / 1024).toFixed(2) + " KB"
+        : null;
 
       const [result] = await pool.query(
         `INSERT INTO transparencia (titulo, descricao, ano, tipo, ficheiro_url, tamanho_ficheiro, criado_por) 
@@ -59,7 +79,7 @@ router.post(
           titulo,
           descricao || null,
           ano,
-          tipo || "Relatorio_Contas",
+          safeTipo,
           ficheiro_url,
           tamanho,
           req.user.id,
@@ -72,6 +92,85 @@ router.post(
         data: { id: result[0].id },
       });
     } catch (error) {
+      console.error("[transparencia] POST error", error);
+            res.status(500).json({
+              success: false,
+              message:
+                error.message?.includes("invalid input value for enum")
+                  ? "Tipo inválido. Use Relatorio_Contas, Relatorio_Atividades ou Outro."
+                  : error.message || "Erro no servidor.",
+            });
+    }
+  }
+);
+
+// PUT - Atualizar documento de transparência (metadados e ficheiro opcional)
+router.put(
+  "/:id",
+  [authenticate, isAdminOrGestor, upload.single("ficheiro")],
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { titulo, descricao, ano, tipo } = req.body;
+
+      const allowedTipos = [
+        "Relatorio",
+        "Contas",
+        "Relatorio_Atividades",
+        "Outro",
+      ];
+
+      const normalizedTipo =
+        tipo === "Relatorio_Contas" ? "Relatorio" : tipo;
+
+      const safeTipo = allowedTipos.includes(normalizedTipo)
+        ? normalizedTipo
+        : "Relatorio";
+
+      // obter registo atual para preservar ficheiro quando não é enviado novo
+      const [existingRows] = await pool.query(
+        "SELECT ficheiro_url, tamanho_ficheiro FROM transparencia WHERE id = $1",
+        [id]
+      );
+      if (!existingRows.length) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Documento não encontrado." });
+      }
+
+      const current = existingRows[0];
+
+      const filePath = req.file?.path || req.file?.secure_url || "";
+      const ficheiro_url = req.file
+        ? filePath.startsWith("http")
+          ? filePath
+          : `/uploads/${req.file.filename}`
+        : current.ficheiro_url;
+
+      const tamanho = req.file
+        ? req.file.size
+          ? (req.file.size / 1024).toFixed(2) + " KB"
+          : current.tamanho_ficheiro
+        : current.tamanho_ficheiro;
+
+      await pool.query(
+        `UPDATE transparencia
+         SET titulo = $1, descricao = $2, ano = $3, tipo = $4, ficheiro_url = $5, tamanho_ficheiro = $6, data_atualizacao = CURRENT_TIMESTAMP
+         WHERE id = $7`,
+        [
+          titulo,
+          descricao || null,
+          ano,
+          safeTipo,
+          ficheiro_url,
+          tamanho,
+          id,
+        ]
+      );
+
+      res.json({ success: true, message: "Documento atualizado com sucesso." });
+    } catch (error) {
+      console.error("[transparencia] PUT error", error);
       res.status(500).json({ success: false, message: "Erro no servidor." });
     }
   }
@@ -85,6 +184,7 @@ router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     ]);
     res.json({ success: true, message: "Documento eliminado com sucesso." });
   } catch (error) {
+    console.error("[transparencia] DELETE error", error);
     res.status(500).json({ success: false, message: "Erro no servidor." });
   }
 });

@@ -88,30 +88,26 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// Servir ficheiros estáticos (uploads)
-// Middleware para resolver URLs de uploads que omitem a subpasta (ex: /uploads/<file>)
-// tenta servir o ficheiro diretamente ou procurar em subpastas comuns (imagens, videos, pdfs)
-app.use("/uploads", (req, res, next) => {
-  // Allow cross-origin use of uploaded resources (images) from the client app
-  // Some helmet defaults set Cross-Origin-Resource-Policy to 'same-origin' which blocks
-  // images served from port 4000 when the frontend runs on 3000. Set to 'cross-origin'.
-  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-  const rel = req.path.replace(/^\//, "");
-  const root = path.resolve(__dirname, "..", "uploads");
-  const tryPath = path.join(root, rel);
-  if (fs.existsSync(tryPath)) {
-    return res.sendFile(tryPath);
-  }
-  // procurar em subpastas comuns
-  const subfolders = ["imagens", "videos", "pdfs", "outros"];
-  for (const f of subfolders) {
-    const alt = path.join(root, f, rel);
-    if (fs.existsSync(alt)) return res.sendFile(alt);
-  }
-  // não encontrado aqui: delegar ao express.static para comportamento padrão (404)
-  next();
-});
-app.use("/uploads", express.static("uploads"));
+// Servir ficheiros estáticos (uploads) apenas se houver diretório local
+// Em produção no Vercel recomenda-se usar Cloudinary; o disco é efémero.
+const uploadsPath = path.resolve(__dirname, "..", "uploads");
+if (fs.existsSync(uploadsPath)) {
+  app.use("/uploads", (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    const rel = req.path.replace(/^\//, "");
+    const tryPath = path.join(uploadsPath, rel);
+    if (fs.existsSync(tryPath)) {
+      return res.sendFile(tryPath);
+    }
+    const subfolders = ["imagens", "videos", "pdfs", "outros"];
+    for (const f of subfolders) {
+      const alt = path.join(uploadsPath, f, rel);
+      if (fs.existsSync(alt)) return res.sendFile(alt);
+    }
+    next();
+  });
+  app.use("/uploads", express.static("uploads"));
+}
 
 // Rotas
 app.use("/api/auth", require("./routes/auth"));

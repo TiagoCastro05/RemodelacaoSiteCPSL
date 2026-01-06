@@ -11,6 +11,21 @@ const PLACEHOLDER_SVG =
     `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'><rect fill='#f6f7fb' width='100%' height='100%'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#888' font-size='28' font-family='Arial, sans-serif'>Imagem</text></svg>`
   );
 
+const PDF_PLACEHOLDER =
+  `data:image/svg+xml;utf8,` +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='350'><rect fill='#0b1930' width='100%' height='100%'/><rect x='40' y='30' rx='18' ry='18' width='520' height='290' fill='#132844' stroke='#4da3ff' stroke-width='6'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='#4da3ff' font-size='64' font-family='Arial, sans-serif' font-weight='700'>PDF</text></svg>`
+  );
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  try {
+    return new Date(dateStr).toLocaleDateString("pt-PT");
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 // Editor simples baseado em contentEditable (compatível com React 19+)
 function RichTextEditor({ value, onChange, api }) {
   const editorRef = useRef(null);
@@ -102,8 +117,6 @@ function RichTextEditor({ value, onChange, api }) {
     setFormats({ bold: false, italic: false, underline: false, list: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // no-op: we keep toolbar button state controlled only by toolbar clicks
 
   return (
     <div className="richtext-editor">
@@ -320,6 +333,7 @@ const Home = ({ isEditMode = false }) => {
     { id: "projetos", label: "Projetos" },
     { id: "respostas-sociais", label: "Respostas Sociais" },
     { id: "noticias", label: "Notícias" },
+    { id: "transparencia", label: "Transparência" },
     { id: "contactos", label: "Contactos" },
   ];
 
@@ -342,6 +356,44 @@ const Home = ({ isEditMode = false }) => {
     };
 
     fetchProjects();
+  }, []);
+
+  // Documentos de Transparência
+  const [transparenciaDocs, setTransparenciaDocs] = useState([]);
+  const [loadingTransparencia, setLoadingTransparencia] = useState(false);
+  const [showTranspModal, setShowTranspModal] = useState(false);
+  const [transpSubmitting, setTranspSubmitting] = useState(false);
+  const [transpError, setTranspError] = useState("");
+  const [transpForm, setTranspForm] = useState({
+    titulo: "",
+    descricao: "",
+    ano: new Date().getFullYear().toString(),
+    tipo: "Relatorio",
+    ficheiro: null,
+  });
+
+  const fetchTransparencia = async () => {
+    try {
+      setLoadingTransparencia(true);
+      const { data } = await api.get("/transparencia");
+      const docs = data?.data || [];
+      const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+      const normalized = docs.map((doc) => {
+        const url = doc.ficheiro_url?.startsWith("http")
+          ? doc.ficheiro_url
+          : `${base}${doc.ficheiro_url}`;
+        return { ...doc, ficheiro_url: url };
+      });
+      setTransparenciaDocs(normalized);
+    } catch (error) {
+      console.error("Erro ao carregar transparência:", error);
+    } finally {
+      setLoadingTransparencia(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransparencia();
   }, []);
 
   // Buscar conteúdo institucional
@@ -499,6 +551,65 @@ const Home = ({ isEditMode = false }) => {
     }
     setEditingId(null);
     setShowAddModal(true);
+  };
+
+  const goToTransparencyAdmin = () => {
+    setShowTranspModal(true);
+    setTranspError("");
+    setTranspSubmitting(false);
+    setTranspForm({
+      titulo: "",
+      descricao: "",
+      ano: new Date().getFullYear().toString(),
+      tipo: "Relatorio",
+      ficheiro: null,
+    });
+  };
+
+  const handleTranspChange = (e) => {
+    const { name, value, files } = e.target;
+    if (name === "ficheiro") {
+      setTranspForm((prev) => ({ ...prev, ficheiro: files?.[0] || null }));
+    } else {
+      setTranspForm((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleTranspSubmit = async (e) => {
+    e.preventDefault();
+    setTranspError("");
+
+    if (!transpForm.titulo.trim() || !transpForm.ano || !transpForm.ficheiro) {
+      setTranspError("Preencha título, ano e selecione um ficheiro PDF.");
+      return;
+    }
+
+    const allowedTipos = ["Relatorio", "Contas", "Relatorio_Atividades", "Outro"];
+    const safeTipo = allowedTipos.includes(transpForm.tipo)
+      ? transpForm.tipo
+      : "Relatorio";
+
+    const payload = new FormData();
+    payload.append("titulo", transpForm.titulo.trim());
+    payload.append("ano", transpForm.ano);
+    payload.append("ficheiro", transpForm.ficheiro);
+    if (transpForm.descricao.trim()) payload.append("descricao", transpForm.descricao.trim());
+    payload.append("tipo", safeTipo);
+
+    try {
+      setTranspSubmitting(true);
+      await api.post("/transparencia", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setShowTranspModal(false);
+      await fetchTransparencia();
+    } catch (error) {
+      const msg =
+        error.response?.data?.message || error.message || "Erro ao enviar documento.";
+      setTranspError(msg);
+    } finally {
+      setTranspSubmitting(false);
+    }
   };
 
   // Salvar nova subseção
@@ -812,6 +923,10 @@ const Home = ({ isEditMode = false }) => {
                       alt={content.titulo}
                       className="content-image"
                       style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = PLACEHOLDER_SVG;
+                      }}
                     />
                   )}
                   {content.subtitulo && (
@@ -824,11 +939,7 @@ const Home = ({ isEditMode = false }) => {
                   )}
                   <div
                     className="content-preview"
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        (content.conteudo || "").substring(0, 200) +
-                        (content.conteudo?.length > 200 ? "..." : ""),
-                    }}
+                    dangerouslySetInnerHTML={{ __html: content.conteudo || "" }}
                   />
                   {content.video_url && (
                     <video controls className="content-video">
@@ -987,6 +1098,10 @@ const Home = ({ isEditMode = false }) => {
                       alt={resposta.titulo}
                       className="content-image"
                       style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = PLACEHOLDER_SVG;
+                      }}
                     />
                   )}
                   {resposta.descricao && (
@@ -1107,6 +1222,63 @@ const Home = ({ isEditMode = false }) => {
         </div>
       </section>
 
+      <section id="transparencia" className="section transparency-section">
+        <div className="container">
+          <div className="section-header-editable">
+            <h2>Transparência</h2>
+            {isEditMode && user && (
+              <button
+                className="btn-add-subsection"
+                onClick={goToTransparencyAdmin}
+                title="Adicionar documento de transparência"
+              >
+                + Adicionar
+              </button>
+            )}
+          </div>
+
+          {loadingTransparencia ? (
+            <p>A carregar documentos...</p>
+          ) : transparenciaDocs.length === 0 ? (
+            <p>Ainda não foram publicados relatórios.</p>
+          ) : (
+            <div className="transparency-grid">
+              {transparenciaDocs.map((doc) => (
+                <div key={doc.id} className="transparency-card">
+                  <div className="transparency-thumb">
+                    <img
+                      src={PDF_PLACEHOLDER}
+                      alt={`Relatório ${doc.titulo || doc.ano || "PDF"}`}
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="transparency-meta">
+                    <h3>{doc.titulo || `Contas ${doc.ano || ""}`}</h3>
+                    <p className="transparency-date">
+                      {doc.ano ? `Ano: ${doc.ano}` : ""}
+                      {doc.data_criacao
+                        ? `${doc.ano ? " · " : ""}${formatDate(doc.data_criacao)}`
+                        : ""}
+                    </p>
+                    {doc.descricao && (
+                      <p className="transparency-desc">{doc.descricao}</p>
+                    )}
+                    {doc.ficheiro_url && (
+                      <button
+                        className="btn-primary"
+                        onClick={() => window.open(doc.ficheiro_url, "_blank")}
+                      >
+                        Ver ficheiro
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Seções Personalizadas */}
       {secoesPersonalizadas.map((secao) => {
         const itens = itensSecoesPersonalizadas[secao.id] || [];
@@ -1169,6 +1341,10 @@ const Home = ({ isEditMode = false }) => {
                           alt={item.titulo}
                           className="content-image"
                           style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = PLACEHOLDER_SVG;
+                          }}
                         />
                       )}
                       {item.titulo && <h3>{item.titulo}</h3>}
@@ -1334,6 +1510,110 @@ const Home = ({ isEditMode = false }) => {
           )}
         </div>
       </section>
+
+      {showTranspModal && (
+        <div
+          className="edit-modal-overlay"
+          onClick={() => setShowTranspModal(false)}
+        >
+          <div
+            className="edit-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="edit-modal-header">
+              <h3>Adicionar documento de transparência</h3>
+              <button className="btn-close" onClick={() => setShowTranspModal(false)}>
+                ✕
+              </button>
+            </div>
+
+            <form className="edit-modal-body" onSubmit={handleTranspSubmit}>
+              <div className="form-group">
+                <label htmlFor="transp-titulo">Título *</label>
+                <input
+                  id="transp-titulo"
+                  name="titulo"
+                  type="text"
+                  value={transpForm.titulo}
+                  onChange={handleTranspChange}
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="transp-ano">Ano *</label>
+                  <input
+                    id="transp-ano"
+                    name="ano"
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    value={transpForm.ano}
+                    onChange={handleTranspChange}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="transp-tipo">Tipo</label>
+                  <select
+                    id="transp-tipo"
+                    name="tipo"
+                    value={transpForm.tipo}
+                    onChange={handleTranspChange}
+                  >
+                    <option value="Relatorio">Relatório & Contas</option>
+                    <option value="Contas">Contas</option>
+                    <option value="Relatorio_Atividades">Relatório de Atividades</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="transp-descricao">Descrição (opcional)</label>
+                <textarea
+                  id="transp-descricao"
+                  name="descricao"
+                  rows="3"
+                  value={transpForm.descricao}
+                  onChange={handleTranspChange}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="transp-ficheiro">Ficheiro PDF *</label>
+                <input
+                  id="transp-ficheiro"
+                  name="ficheiro"
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleTranspChange}
+                  required
+                />
+                {transpForm.ficheiro && (
+                  <small>Selecionado: {transpForm.ficheiro.name}</small>
+                )}
+              </div>
+
+              {transpError && <div className="alert alert-error">{transpError}</div>}
+
+              <div className="form-actions" style={{ gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowTranspModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary" disabled={transpSubmitting}>
+                  {transpSubmitting ? "A enviar..." : "Guardar documento"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <footer className="footer">
         <div className="container">

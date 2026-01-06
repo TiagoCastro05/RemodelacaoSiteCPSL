@@ -13,6 +13,9 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
     { id: "projetos", label: "Projetos" },
     { id: "respostas-sociais", label: "Respostas Sociais" },
     { id: "noticias", label: "Notícias" },
+    { id: "transparencia", label: "Transparência" },
+    // contacto será reposicionado para o fim abaixo
+    { id: "contactos", label: "Contactos" },
   ];
 
   // Combinar seções padrão com personalizadas (antes dos contactos)
@@ -21,8 +24,12 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
     label: `${secao.icone || ""} ${secao.titulo}`.trim(),
   }));
 
+  const baseSections = (sections.length > 0 ? sections : defaultSections).filter(
+    (s) => s.id !== "contactos"
+  );
+
   const menuSections = [
-    ...(sections.length > 0 ? sections : defaultSections),
+    ...baseSections,
     ...secoesPersonalizadasMenu,
     { id: "contactos", label: "Contactos" },
   ];
