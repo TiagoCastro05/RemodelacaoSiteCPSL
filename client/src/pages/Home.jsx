@@ -506,11 +506,19 @@ const Home = ({ isEditMode = false }) => {
   }, []);
 
   // Abrir modal de edição
-  const handleEdit = (section, data = {}, id = null) => {
+  const handleEdit = (
+    section,
+    data = {},
+    id = null,
+    secaoPersonalizadaData = null
+  ) => {
     lastFocusedRef.current = document.activeElement;
     setEditingSection(section);
     setEditingData(data);
     setEditingId(id);
+    if (secaoPersonalizadaData) {
+      setEditingSecaoPersonalizada(secaoPersonalizadaData);
+    }
     setShowEditModal(true);
   };
 
@@ -678,12 +686,20 @@ const Home = ({ isEditMode = false }) => {
   };
 
   // Eliminar subseção
-  const handleDelete = async (id, section) => {
+  const handleDelete = async (id, section, secaoId = null) => {
     if (!window.confirm("Tem certeza que deseja eliminar este item?")) {
       return;
     }
     try {
-      if (section === "respostas-sociais") {
+      if (section === "secao-personalizada" && secaoId) {
+        await api.delete(`/secoes-personalizadas/${secaoId}/itens/${id}`);
+        setItensSecoesPersonalizadas({
+          ...itensSecoesPersonalizadas,
+          [secaoId]: (itensSecoesPersonalizadas[secaoId] || []).filter(
+            (item) => item.id !== id
+          ),
+        });
+      } else if (section === "respostas-sociais") {
         await api.delete(`/respostas-sociais/${id}`);
         setRespostasSociais(respostasSociais.filter((r) => r.id !== id));
       } else if (section === "noticias") {
@@ -783,7 +799,26 @@ const Home = ({ isEditMode = false }) => {
   // Salvar edição
   const handleSave = async () => {
     try {
-      if (editingSection === "institucional" && editingId) {
+      if (
+        editingSection === "secao-personalizada" &&
+        editingId &&
+        editingSecaoPersonalizada
+      ) {
+        await api.put(
+          `/secoes-personalizadas/${editingSecaoPersonalizada.id}/itens/${editingId}`,
+          editingData
+        );
+        setItensSecoesPersonalizadas({
+          ...itensSecoesPersonalizadas,
+          [editingSecaoPersonalizada.id]: (
+            itensSecoesPersonalizadas[editingSecaoPersonalizada.id] || []
+          ).map((item) =>
+            item.id === editingId ? { ...item, ...editingData } : item
+          ),
+        });
+        closeEditModal();
+        alert("Item atualizado com sucesso!");
+      } else if (editingSection === "institucional" && editingId) {
         await api.put(`/conteudo/${editingId}`, editingData);
         setConteudoInstitucional(
           conteudoInstitucional.map((c) =>
@@ -1343,6 +1378,42 @@ const Home = ({ isEditMode = false }) => {
                             : "default",
                       }}
                     >
+                      <div className="subsection-header">
+                        {item.titulo && <h3>{item.titulo}</h3>}
+                        {isEditMode && user && (
+                          <div className="subsection-actions">
+                            <button
+                              className="btn-edit-inline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(
+                                  "secao-personalizada",
+                                  item,
+                                  item.id,
+                                  secao
+                                );
+                              }}
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className="btn-delete-inline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(
+                                  item.id,
+                                  "secao-personalizada",
+                                  secao.id
+                                );
+                              }}
+                              title="Eliminar"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       {item.imagem && (
                         <img
                           src={item.imagem}
@@ -1355,7 +1426,6 @@ const Home = ({ isEditMode = false }) => {
                           }}
                         />
                       )}
-                      {item.titulo && <h3>{item.titulo}</h3>}
                       {item.subtitulo && (
                         <p
                           style={{
@@ -1894,6 +1964,129 @@ const Home = ({ isEditMode = false }) => {
                       }
                       api={api}
                     />
+                  </label>
+                </>
+              )}
+
+              {editingSection === "secao-personalizada" && (
+                <>
+                  <div className="cover-image-upload">
+                    <label>
+                      <strong>Imagem:</strong>
+                      <div className="cover-preview-row">
+                        {editingData.imagem ? (
+                          <img
+                            src={editingData.imagem}
+                            alt="Preview"
+                            className="cover-preview"
+                            onError={(e) => {
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        ) : (
+                          <div className="cover-placeholder">
+                            Nenhuma imagem
+                          </div>
+                        )}
+                        <div className="cover-actions">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const f = e.target.files[0];
+                              if (f) await uploadCoverImage(f);
+                            }}
+                          />
+                          <small className="hint">Enviar imagem</small>
+                          {editingData.imagem && (
+                            <button
+                              type="button"
+                              className="btn-remove-image"
+                              onClick={() =>
+                                setEditingData({ ...editingData, imagem: "" })
+                              }
+                              title="Remover imagem"
+                            >
+                              🗑️ Remover
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <label>
+                    <strong>Título:</strong>
+                    <input
+                      type="text"
+                      value={editingData.titulo || ""}
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          titulo: e.target.value,
+                        })
+                      }
+                      placeholder="Título do item"
+                    />
+                  </label>
+
+                  <label>
+                    <strong>Subtítulo:</strong>
+                    <input
+                      type="text"
+                      value={editingData.subtitulo || ""}
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          subtitulo: e.target.value,
+                        })
+                      }
+                      placeholder="Subtítulo ou resumo breve"
+                    />
+                  </label>
+
+                  <label>
+                    <strong>Conteúdo:</strong>
+                    <RichTextEditor
+                      value={editingData.conteudo || ""}
+                      onChange={(value) =>
+                        setEditingData({ ...editingData, conteudo: value })
+                      }
+                      api={api}
+                    />
+                  </label>
+
+                  <label>
+                    <strong>URL de Vídeo (opcional):</strong>
+                    <input
+                      type="url"
+                      value={editingData.video_url || ""}
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          video_url: e.target.value,
+                        })
+                      }
+                      placeholder="https://..."
+                    />
+                  </label>
+
+                  <label>
+                    <strong>Link Externo (opcional):</strong>
+                    <input
+                      type="url"
+                      value={editingData.link_externo || ""}
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          link_externo: e.target.value,
+                        })
+                      }
+                      placeholder="https://..."
+                    />
+                    <small className="hint">
+                      Se preenchido, o item será um link clicável
+                    </small>
                   </label>
                 </>
               )}
