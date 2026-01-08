@@ -11,12 +11,12 @@ function CustomSectionsManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingSecao, setEditingSecao] = useState(null);
+  const [draggedItem, setDraggedItem] = useState(null);
   const [formData, setFormData] = useState({
     nome: "",
     titulo: "",
     slug: "",
     descricao: "",
-    icone: "📄",
     tipo_layout: "cards",
     tem_formulario: false,
   });
@@ -52,7 +52,6 @@ function CustomSectionsManagement() {
         titulo: secao.titulo,
         slug: secao.slug,
         descricao: secao.descricao || "",
-        icone: secao.icone || "📄",
         tipo_layout: secao.tipo_layout || "cards",
         tem_formulario: secao.tem_formulario || false,
       });
@@ -63,7 +62,6 @@ function CustomSectionsManagement() {
         titulo: "",
         slug: "",
         descricao: "",
-        icone: "📄",
         tipo_layout: "cards",
         tem_formulario: false,
       });
@@ -88,6 +86,49 @@ function CustomSectionsManagement() {
     } catch (error) {
       console.error("Erro ao salvar seção:", error);
       alert(error.response?.data?.message || "Erro ao salvar seção.");
+    }
+  };
+
+  const handleDragStart = (e, secao) => {
+    setDraggedItem(secao);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = async (e, targetSecao) => {
+    e.preventDefault();
+    if (!draggedItem || draggedItem.id === targetSecao.id) {
+      setDraggedItem(null);
+      return;
+    }
+
+    try {
+      const draggedIndex = secoes.findIndex((s) => s.id === draggedItem.id);
+      const targetIndex = secoes.findIndex((s) => s.id === targetSecao.id);
+
+      const newSecoes = [...secoes];
+      const [movedSecao] = newSecoes.splice(draggedIndex, 1);
+      newSecoes.splice(targetIndex, 0, movedSecao);
+
+      // Atualizar ordem no backend
+      const updatePromises = newSecoes.map((secao, index) =>
+        api.put(`/secoes-personalizadas/${secao.id}`, {
+          ...secao,
+          ordem: index + 1,
+        })
+      );
+
+      await Promise.all(updatePromises);
+      setDraggedItem(null);
+      fetchSecoes();
+    } catch (error) {
+      console.error("Erro ao reordenar:", error);
+      alert("Erro ao alterar ordem da seção.");
+      setDraggedItem(null);
     }
   };
 
@@ -150,7 +191,6 @@ function CustomSectionsManagement() {
             <thead>
               <tr>
                 <th>Ordem</th>
-                <th>Ícone</th>
                 <th>Título</th>
                 <th>Nome/Slug</th>
                 <th>Layout</th>
@@ -160,9 +200,27 @@ function CustomSectionsManagement() {
             </thead>
             <tbody>
               {secoes.map((secao) => (
-                <tr key={secao.id}>
-                  <td>{secao.ordem}</td>
-                  <td style={{ fontSize: "1.5em" }}>{secao.icone}</td>
+                <tr
+                  key={secao.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, secao)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, secao)}
+                  style={{
+                    cursor: "move",
+                    opacity: draggedItem?.id === secao.id ? 0.5 : 1,
+                    backgroundColor:
+                      draggedItem?.id === secao.id ? "#f0f0f0" : "transparent",
+                  }}
+                >
+                  <td>
+                    <span
+                      style={{ cursor: "grab", userSelect: "none" }}
+                      title="Arrastar para reordenar"
+                    >
+                      ☰ {secao.ordem}
+                    </span>
+                  </td>
                   <td>
                     <strong>{secao.titulo}</strong>
                   </td>
@@ -280,22 +338,6 @@ function CustomSectionsManagement() {
                   <small className="hint">
                     Usado para âncora:{" "}
                     <code>#{formData.slug || "galeria"}</code>
-                  </small>
-                </label>
-
-                <label>
-                  <strong>Ícone:</strong>
-                  <input
-                    type="text"
-                    value={formData.icone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, icone: e.target.value })
-                    }
-                    placeholder="📸"
-                    maxLength="10"
-                  />
-                  <small className="hint">
-                    Emoji ou texto curto (ex: 📸, 👥, 🏆)
                   </small>
                 </label>
 

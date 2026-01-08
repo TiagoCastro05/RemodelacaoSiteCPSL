@@ -584,7 +584,12 @@ const Home = ({ isEditMode = false }) => {
       return;
     }
 
-    const allowedTipos = ["Relatorio", "Contas", "Relatorio_Atividades", "Outro"];
+    const allowedTipos = [
+      "Relatorio",
+      "Contas",
+      "Relatorio_Atividades",
+      "Outro",
+    ];
     const safeTipo = allowedTipos.includes(transpForm.tipo)
       ? transpForm.tipo
       : "Relatorio";
@@ -593,7 +598,8 @@ const Home = ({ isEditMode = false }) => {
     payload.append("titulo", transpForm.titulo.trim());
     payload.append("ano", transpForm.ano);
     payload.append("ficheiro", transpForm.ficheiro);
-    if (transpForm.descricao.trim()) payload.append("descricao", transpForm.descricao.trim());
+    if (transpForm.descricao.trim())
+      payload.append("descricao", transpForm.descricao.trim());
     payload.append("tipo", safeTipo);
 
     try {
@@ -605,7 +611,9 @@ const Home = ({ isEditMode = false }) => {
       await fetchTransparencia();
     } catch (error) {
       const msg =
-        error.response?.data?.message || error.message || "Erro ao enviar documento.";
+        error.response?.data?.message ||
+        error.message ||
+        "Erro ao enviar documento.";
       setTranspError(msg);
     } finally {
       setTranspSubmitting(false);
@@ -661,7 +669,7 @@ const Home = ({ isEditMode = false }) => {
         }
       }
 
-  closeAddModal();
+      closeAddModal();
       alert("Conteúdo adicionado com sucesso!");
     } catch (error) {
       console.error("Erro ao adicionar:", error);
@@ -1257,7 +1265,9 @@ const Home = ({ isEditMode = false }) => {
                     <p className="transparency-date">
                       {doc.ano ? `Ano: ${doc.ano}` : ""}
                       {doc.data_criacao
-                        ? `${doc.ano ? " · " : ""}${formatDate(doc.data_criacao)}`
+                        ? `${doc.ano ? " · " : ""}${formatDate(
+                            doc.data_criacao
+                          )}`
                         : ""}
                     </p>
                     {doc.descricao && (
@@ -1287,9 +1297,7 @@ const Home = ({ isEditMode = false }) => {
           <section key={secao.id} id={secao.slug} className="section">
             <div className="container">
               <div className="section-header-editable">
-                <h2>
-                  {secao.icone} {secao.titulo}
-                </h2>
+                <h2>{secao.titulo}</h2>
                 {isEditMode && user && (
                   <button
                     className="btn-add-subsection"
@@ -1516,13 +1524,13 @@ const Home = ({ isEditMode = false }) => {
           className="edit-modal-overlay"
           onClick={() => setShowTranspModal(false)}
         >
-          <div
-            className="edit-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
             <div className="edit-modal-header">
               <h3>Adicionar documento de transparência</h3>
-              <button className="btn-close" onClick={() => setShowTranspModal(false)}>
+              <button
+                className="btn-close"
+                onClick={() => setShowTranspModal(false)}
+              >
                 ✕
               </button>
             </div>
@@ -1564,7 +1572,9 @@ const Home = ({ isEditMode = false }) => {
                   >
                     <option value="Relatorio">Relatório & Contas</option>
                     <option value="Contas">Contas</option>
-                    <option value="Relatorio_Atividades">Relatório de Atividades</option>
+                    <option value="Relatorio_Atividades">
+                      Relatório de Atividades
+                    </option>
                     <option value="Outro">Outro</option>
                   </select>
                 </div>
@@ -1596,7 +1606,9 @@ const Home = ({ isEditMode = false }) => {
                 )}
               </div>
 
-              {transpError && <div className="alert alert-error">{transpError}</div>}
+              {transpError && (
+                <div className="alert alert-error">{transpError}</div>
+              )}
 
               <div className="form-actions" style={{ gap: "10px" }}>
                 <button
@@ -1606,7 +1618,11 @@ const Home = ({ isEditMode = false }) => {
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn-primary" disabled={transpSubmitting}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={transpSubmitting}
+                >
                   {transpSubmitting ? "A enviar..." : "Guardar documento"}
                 </button>
               </div>
@@ -1626,10 +1642,7 @@ const Home = ({ isEditMode = false }) => {
 
       {/* Modal de Edição Inline */}
       {showEditModal && (
-        <div
-          className="edit-modal-overlay"
-          onClick={closeEditModal}
-        >
+        <div className="edit-modal-overlay" onClick={closeEditModal}>
           <div
             className="edit-modal"
             onClick={(e) => e.stopPropagation()}
@@ -1642,10 +1655,7 @@ const Home = ({ isEditMode = false }) => {
                   ? "Instituição"
                   : editingSection}
               </h3>
-              <button
-                className="btn-close"
-                onClick={closeEditModal}
-              >
+              <button className="btn-close" onClick={closeEditModal}>
                 ✕
               </button>
             </div>
@@ -1936,10 +1946,7 @@ const Home = ({ isEditMode = false }) => {
               )}
             </div>
             <div className="edit-modal-footer">
-              <button
-                className="btn-cancel"
-                onClick={closeEditModal}
-              >
+              <button className="btn-cancel" onClick={closeEditModal}>
                 Cancelar
               </button>
               <button className="btn-save" onClick={handleSave}>
@@ -1952,10 +1959,7 @@ const Home = ({ isEditMode = false }) => {
 
       {/* Modal de Visualização da Notícia */}
       {showNewsModal && selectedNews && (
-        <div
-          className="edit-modal-overlay"
-          onClick={closeNewsModal}
-        >
+        <div className="edit-modal-overlay" onClick={closeNewsModal}>
           <div
             className="edit-modal"
             onClick={(e) => e.stopPropagation()}
@@ -1963,10 +1967,7 @@ const Home = ({ isEditMode = false }) => {
           >
             <div className="edit-modal-header">
               <h3>{selectedNews.titulo}</h3>
-              <button
-                className="btn-close"
-                onClick={closeNewsModal}
-              >
+              <button className="btn-close" onClick={closeNewsModal}>
                 ✕
               </button>
             </div>
@@ -2150,10 +2151,7 @@ const Home = ({ isEditMode = false }) => {
 
       {/* Modal Adicionar Subseção */}
       {showAddModal && (
-        <div
-          className="edit-modal-overlay"
-          onClick={closeAddModal}
-        >
+        <div className="edit-modal-overlay" onClick={closeAddModal}>
           <div
             className="edit-modal"
             onClick={(e) => e.stopPropagation()}
@@ -2170,10 +2168,7 @@ const Home = ({ isEditMode = false }) => {
                   ? "Notícia"
                   : "Subseção Institucional"}
               </h3>
-              <button
-                className="btn-close"
-                onClick={closeAddModal}
-              >
+              <button className="btn-close" onClick={closeAddModal}>
                 ✕
               </button>
             </div>

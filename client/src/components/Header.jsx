@@ -21,12 +21,12 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
   // Combinar seções padrão com personalizadas (antes dos contactos)
   const secoesPersonalizadasMenu = customSections.map((secao) => ({
     id: secao.slug,
-    label: `${secao.icone || ""} ${secao.titulo}`.trim(),
+    label: secao.titulo,
   }));
 
-  const baseSections = (sections.length > 0 ? sections : defaultSections).filter(
-    (s) => s.id !== "contactos"
-  );
+  const baseSections = (
+    sections.length > 0 ? sections : defaultSections
+  ).filter((s) => s.id !== "contactos");
 
   const menuSections = [
     ...baseSections,
