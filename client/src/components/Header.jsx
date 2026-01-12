@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "../styles/Header.css";
+import logo from "../img/logo.png";
 
 const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -118,8 +119,11 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
       <div className="header-container">
         <div className="header-logo">
           <a href="#top" onClick={scrollToTop}>
-            <h1>CPSL</h1>
-            <span>Centro Paroquial e Social de Lanheses</span>
+            <img src={logo} alt="Logo CPSL" className="logo-image" />
+            <div className="logo-text">
+              <h1>CPSL</h1>
+              <span>Centro Paroquial e Social de Lanheses</span>
+            </div>
           </a>
         </div>
 

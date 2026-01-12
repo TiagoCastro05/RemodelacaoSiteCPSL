@@ -34,7 +34,8 @@
 /* Logo */
 .header-logo a {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
   text-decoration: none;
   color: #2c3e50;
   transition: color 0.3s ease;
@@ -42,6 +43,17 @@
 
 .header-logo a:hover {
   color: #3498db;
+}
+
+.header-logo .logo-image {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+}
+
+.header-logo .logo-text {
+  display: flex;
+  flex-direction: column;
 }
 
 .header-logo h1 {
