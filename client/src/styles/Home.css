@@ -14,6 +14,7 @@
   );
   text-align: center;
   padding: 80px 20px;
+  position: relative;
 }
 
 .hero-section h1 {
@@ -21,6 +22,9 @@
   color: var(--primary-color);
   margin-bottom: 24px;
   animation: fadeIn 1s ease-out;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 1;
 }
 
 .hero-section p {
@@ -28,6 +32,25 @@
   color: var(--text-secondary);
   margin-bottom: 32px;
   animation: fadeIn 1s ease-out 0.2s backwards;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 1;
+}
+
+/* Ajustar cores do texto quando há imagem de fundo */
+.hero-section[style*="background-image"] h1 {
+  color: #ffffff;
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
+}
+
+.hero-section[style*="background-image"] p {
+  color: #ffffff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.hero-section .container {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes fadeIn {
@@ -365,8 +388,8 @@
 
 .btn-edit-hero {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 430px;
+  right: 490px;
   z-index: 10;
 }
 

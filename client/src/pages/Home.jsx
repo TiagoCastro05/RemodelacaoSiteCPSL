@@ -278,16 +278,13 @@ const DATE_MAX = new Date().toISOString().slice(0, 10);
 const DATE_FUTURE_MAX = "2100-12-31";
 
 const normalizeFormOptions = (opcoes = []) => {
-  return opcoes
-    .filter(Boolean)
-    .map((opt, idx) => {
-      const tipo = opt?.tipo || opt?.id || opt?.value || opt;
-      return {
-        tipo,
-        label:
-          opt?.label || FORM_TYPE_LABELS[tipo] || `Formulário ${idx + 1}`,
-      };
-    });
+  return opcoes.filter(Boolean).map((opt, idx) => {
+    const tipo = opt?.tipo || opt?.id || opt?.value || opt;
+    return {
+      tipo,
+      label: opt?.label || FORM_TYPE_LABELS[tipo] || `Formulário ${idx + 1}`,
+    };
+  });
 };
 
 const getFormConfig = (secao) => {
@@ -347,6 +344,12 @@ const Home = ({ isEditMode = false }) => {
   const [formSelections, setFormSelections] = useState({});
   const [crecheSelecao, setCrecheSelecao] = useState({});
   const [crecheNasceuState, setCrecheNasceuState] = useState({});
+  const [heroConfig, setHeroConfig] = useState({
+    titulo: "Centro Paroquial e Social de Lanheses",
+    subtitulo:
+      "Dedicando-nos ao apoio social à Pessoas Mais Velhas e à Infância",
+    imagem_fundo: "",
+  });
   const lastFocusedRef = useRef(null);
   const editModalRef = useRef(null);
   const addModalRef = useRef(null);
@@ -406,6 +409,18 @@ const Home = ({ isEditMode = false }) => {
     { id: "transparencia", label: "Transparência" },
     { id: "contactos", label: "Contactos" },
   ];
+
+  // Carregar configuração do hero do localStorage
+  useEffect(() => {
+    const savedHeroConfig = localStorage.getItem("heroConfig");
+    if (savedHeroConfig) {
+      try {
+        setHeroConfig(JSON.parse(savedHeroConfig));
+      } catch (e) {
+        console.error("Erro ao carregar configuração do hero:", e);
+      }
+    }
+  }, []);
 
   // Buscar projetos da API
   useEffect(() => {
@@ -940,8 +955,16 @@ const Home = ({ isEditMode = false }) => {
         closeEditModal();
         alert("Notícia atualizada com sucesso!");
       } else if (editingSection === "hero") {
-        alert("Funcionalidade de edição do Hero será implementada");
+        // Salvar configuração do hero no localStorage
+        const newHeroConfig = {
+          titulo: editingData.titulo || heroConfig.titulo,
+          subtitulo: editingData.subtitulo || heroConfig.subtitulo,
+          imagem_fundo: editingData.imagem_fundo || heroConfig.imagem_fundo,
+        };
+        setHeroConfig(newHeroConfig);
+        localStorage.setItem("heroConfig", JSON.stringify(newHeroConfig));
         closeEditModal();
+        alert("Hero atualizado com sucesso!");
       } else if (editingSection === "contactos") {
         alert("Funcionalidade de edição de Contactos será implementada");
         closeEditModal();
@@ -960,16 +983,26 @@ const Home = ({ isEditMode = false }) => {
         isEditMode={isEditMode}
       />
 
-      <section className="hero-section">
+      <section
+        className="hero-section"
+        style={{
+          backgroundImage: heroConfig.imagem_fundo
+            ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${heroConfig.imagem_fundo})`
+            : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
         <div className="container">
           {isEditMode && user && (
             <button
               className="btn-edit-inline btn-edit-hero"
               onClick={() =>
                 handleEdit("hero", {
-                  titulo: "Centro Paroquial e Social de Lanheses",
-                  subtitulo:
-                    "Dedicando-nos ao apoio social à Pessoas Mais Velhas e à Infância",
+                  titulo: heroConfig.titulo,
+                  subtitulo: heroConfig.subtitulo,
+                  imagem_fundo: heroConfig.imagem_fundo,
                 })
               }
               title="Editar Hero"
@@ -977,10 +1010,8 @@ const Home = ({ isEditMode = false }) => {
               ✏️
             </button>
           )}
-          <h1>Centro Paroquial e Social de Lanheses</h1>
-          <p>
-            Dedicando-nos ao apoio social à Pessoas Mais Velhas e à Infância
-          </p>
+          <h1>{heroConfig.titulo}</h1>
+          <p>{heroConfig.subtitulo}</p>
           <a href="#contactos" className="btn-primary">
             Entre em Contacto
           </a>
@@ -1438,7 +1469,9 @@ const Home = ({ isEditMode = false }) => {
         )?.label;
 
         const crecheSections = secoesPersonalizadas.filter((s) => {
-          const key = `${s.slug || ""} ${s.nome || ""} ${s.titulo || ""}`.toLowerCase();
+          const key = `${s.slug || ""} ${s.nome || ""} ${
+            s.titulo || ""
+          }`.toLowerCase();
           return key.includes("creche");
         });
         const crecheOptions = (
@@ -1828,11 +1861,14 @@ const Home = ({ isEditMode = false }) => {
                           )
                         ) {
                           try {
-                            await api.put(`/secoes-personalizadas/${secao.id}`, {
-                              ...secao,
-                              tem_formulario: false,
-                              config_formulario: null,
-                            });
+                            await api.put(
+                              `/secoes-personalizadas/${secao.id}`,
+                              {
+                                ...secao,
+                                tem_formulario: false,
+                                config_formulario: null,
+                              }
+                            );
                             setSecoesPersonalizadas(
                               secoesPersonalizadas.map((s) =>
                                 s.id === secao.id
@@ -1949,9 +1985,7 @@ const Home = ({ isEditMode = false }) => {
                           </div>
 
                           <div className="form-field email-field">
-                            <label htmlFor={`email-${secao.id}`}>
-                              Email
-                            </label>
+                            <label htmlFor={`email-${secao.id}`}>Email</label>
                             <div className="input-with-icon">
                               <span className="input-icon">✉️</span>
                               <input
@@ -1966,9 +2000,7 @@ const Home = ({ isEditMode = false }) => {
                         </div>
 
                         <div className="form-field subject-field">
-                          <label htmlFor={`assunto-${secao.id}`}>
-                            Assunto
-                          </label>
+                          <label htmlFor={`assunto-${secao.id}`}>Assunto</label>
                           <div className="input-with-icon">
                             <span className="input-icon">📝</span>
                             <input
@@ -1993,10 +2025,7 @@ const Home = ({ isEditMode = false }) => {
                           />
                         </div>
 
-                        <div
-                          className="form-actions"
-                          style={{ marginTop: 10 }}
-                        >
+                        <div className="form-actions" style={{ marginTop: 10 }}>
                           <button type="submit" className="btn-save">
                             Enviar Mensagem
                           </button>
@@ -2023,7 +2052,8 @@ const Home = ({ isEditMode = false }) => {
                             nif: form.nif.value,
                             niss: form.niss.value,
                             numero_utente: form.numero_utente.value,
-                            contacto_nome_completo: form.contacto_nome_completo.value,
+                            contacto_nome_completo:
+                              form.contacto_nome_completo.value,
                             contacto_telefone: form.contacto_telefone.value,
                             contacto_email: form.contacto_email.value,
                             contacto_parentesco: form.contacto_parentesco.value,
@@ -2183,9 +2213,7 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label htmlFor={`nif-${secao.id}`}>
-                              NIF
-                            </label>
+                            <label htmlFor={`nif-${secao.id}`}>NIF</label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
                               <input
@@ -2200,9 +2228,7 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label htmlFor={`niss-${secao.id}`}>
-                              NISS
-                            </label>
+                            <label htmlFor={`niss-${secao.id}`}>NISS</label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
                               <input
@@ -2231,7 +2257,9 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label htmlFor={`contacto_nome_completo-${secao.id}`}>
+                            <label
+                              htmlFor={`contacto_nome_completo-${secao.id}`}
+                            >
                               Nome do contacto
                             </label>
                             <div className="input-with-icon">
@@ -2304,10 +2332,7 @@ const Home = ({ isEditMode = false }) => {
                           />
                         </div>
 
-                        <div
-                          className="form-actions"
-                          style={{ marginTop: 10 }}
-                        >
+                        <div className="form-actions" style={{ marginTop: 10 }}>
                           <button type="submit" className="btn-save">
                             Enviar inscrição ERPI
                           </button>
@@ -2338,7 +2363,8 @@ const Home = ({ isEditMode = false }) => {
                             selectedCrecheInput?.value ||
                             "";
 
-                          const crianca_nasceu = form.crianca_nasceu.value === "sim";
+                          const crianca_nasceu =
+                            form.crianca_nasceu.value === "sim";
 
                           const data = {
                             creche_opcao: creche_opcao_label,
@@ -2385,7 +2411,12 @@ const Home = ({ isEditMode = false }) => {
                               selectedFormLabel || selectedFormType,
                           };
 
-                          if (!data.nome_completo || !data.morada || !data.codigo_postal || !data.localidade) {
+                          if (
+                            !data.nome_completo ||
+                            !data.morada ||
+                            !data.codigo_postal ||
+                            !data.localidade
+                          ) {
                             alert("Preencha os campos obrigatórios.");
                             return;
                           }
@@ -2402,7 +2433,9 @@ const Home = ({ isEditMode = false }) => {
                           try {
                             const resp = await api.post("/forms/creche", data);
                             if (resp.data?.success) {
-                              alert("Inscrição Creche enviada. Entraremos em contacto.");
+                              alert(
+                                "Inscrição Creche enviada. Entraremos em contacto."
+                              );
                               form.reset();
                             } else {
                               alert("Erro ao enviar inscrição.");
@@ -2415,7 +2448,10 @@ const Home = ({ isEditMode = false }) => {
                       >
                         <div className="form-field">
                           <label>Escolha a creche</label>
-                          <div className="form-selector-options" style={{ marginTop: 4 }}>
+                          <div
+                            className="form-selector-options"
+                            style={{ marginTop: 4 }}
+                          >
                             {crecheOptionsWithAmbas.map((opt, idx) => (
                               <label
                                 key={opt.id || opt.label}
@@ -2504,7 +2540,10 @@ const Home = ({ isEditMode = false }) => {
                                   name="crianca_nasceu"
                                   value="sim"
                                   onChange={() => {
-                                    setCrecheNasceuState((prev) => ({ ...prev, [secao.id]: true }));
+                                    setCrecheNasceuState((prev) => ({
+                                      ...prev,
+                                      [secao.id]: true,
+                                    }));
                                   }}
                                   required
                                 />
@@ -2516,7 +2555,10 @@ const Home = ({ isEditMode = false }) => {
                                   name="crianca_nasceu"
                                   value="nao"
                                   onChange={() => {
-                                    setCrecheNasceuState((prev) => ({ ...prev, [secao.id]: false }));
+                                    setCrecheNasceuState((prev) => ({
+                                      ...prev,
+                                      [secao.id]: false,
+                                    }));
                                   }}
                                   required
                                 />
@@ -2563,7 +2605,10 @@ const Home = ({ isEditMode = false }) => {
                             <label>CC/BI</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🪪</span>
-                              <input name="cc_bi_numero" placeholder="Número CC/BI" />
+                              <input
+                                name="cc_bi_numero"
+                                placeholder="Número CC/BI"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
@@ -2584,7 +2629,10 @@ const Home = ({ isEditMode = false }) => {
                             <label>Nº Utente</label>
                             <div className="input-with-icon">
                               <span className="input-icon">💳</span>
-                              <input name="numero_utente" placeholder="Número de utente" />
+                              <input
+                                name="numero_utente"
+                                placeholder="Número de utente"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2595,21 +2643,30 @@ const Home = ({ isEditMode = false }) => {
                             <label>Nome da Mãe</label>
                             <div className="input-with-icon">
                               <span className="input-icon">👩</span>
-                              <input name="mae_nome" placeholder="Nome da mãe" />
+                              <input
+                                name="mae_nome"
+                                placeholder="Nome da mãe"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
                             <label>Profissão</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🧑‍💼</span>
-                              <input name="mae_profissao" placeholder="Profissão" />
+                              <input
+                                name="mae_profissao"
+                                placeholder="Profissão"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
                             <label>Local de emprego</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏢</span>
-                              <input name="mae_local_emprego" placeholder="Local de emprego" />
+                              <input
+                                name="mae_local_emprego"
+                                placeholder="Local de emprego"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2637,7 +2694,10 @@ const Home = ({ isEditMode = false }) => {
                             <label>Localidade</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏘️</span>
-                              <input name="mae_localidade" placeholder="Localidade" />
+                              <input
+                                name="mae_localidade"
+                                placeholder="Localidade"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2646,7 +2706,10 @@ const Home = ({ isEditMode = false }) => {
                             <label>Telemóvel</label>
                             <div className="input-with-icon">
                               <span className="input-icon">📱</span>
-                              <input name="mae_telemovel" placeholder="Telemóvel" />
+                              <input
+                                name="mae_telemovel"
+                                placeholder="Telemóvel"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
@@ -2667,21 +2730,30 @@ const Home = ({ isEditMode = false }) => {
                             <label>Nome do Pai</label>
                             <div className="input-with-icon">
                               <span className="input-icon">👨</span>
-                              <input name="pai_nome" placeholder="Nome do pai" />
+                              <input
+                                name="pai_nome"
+                                placeholder="Nome do pai"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
                             <label>Profissão do pai</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🧑‍💼</span>
-                              <input name="pai_profissao" placeholder="Profissão" />
+                              <input
+                                name="pai_profissao"
+                                placeholder="Profissão"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
                             <label>Local de emprego do pai</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏢</span>
-                              <input name="pai_local_emprego" placeholder="Local de emprego" />
+                              <input
+                                name="pai_local_emprego"
+                                placeholder="Local de emprego"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2709,7 +2781,10 @@ const Home = ({ isEditMode = false }) => {
                             <label>Localidade</label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏘️</span>
-                              <input name="pai_localidade" placeholder="Localidade" />
+                              <input
+                                name="pai_localidade"
+                                placeholder="Localidade"
+                              />
                             </div>
                           </div>
                         </div>
@@ -2718,7 +2793,10 @@ const Home = ({ isEditMode = false }) => {
                             <label>Telemóvel</label>
                             <div className="input-with-icon">
                               <span className="input-icon">📱</span>
-                              <input name="pai_telemovel" placeholder="Telemóvel" />
+                              <input
+                                name="pai_telemovel"
+                                placeholder="Telemóvel"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
@@ -2736,13 +2814,26 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>Irmãos a frequentar o estabelecimento?</label>
+                            <label>
+                              Irmãos a frequentar o estabelecimento?
+                            </label>
                             <div className="radio-group">
                               <label>
-                                <input type="radio" name="irmaos_frequentam" value="sim" /> Sim
+                                <input
+                                  type="radio"
+                                  name="irmaos_frequentam"
+                                  value="sim"
+                                />{" "}
+                                Sim
                               </label>
                               <label>
-                                <input type="radio" name="irmaos_frequentam" value="nao" defaultChecked /> Não
+                                <input
+                                  type="radio"
+                                  name="irmaos_frequentam"
+                                  value="nao"
+                                  defaultChecked
+                                />{" "}
+                                Não
                               </label>
                             </div>
                           </div>
@@ -2750,7 +2841,9 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>A criança necessita de apoio especial?</label>
+                            <label>
+                              A criança necessita de apoio especial?
+                            </label>
                             <div className="radio-group">
                               <label>
                                 <input
@@ -2758,7 +2851,9 @@ const Home = ({ isEditMode = false }) => {
                                   name="necessita_apoio"
                                   value="sim"
                                   onChange={() => {
-                                    const wrap = document.getElementById(`apoio-wrap-${secao.id}`);
+                                    const wrap = document.getElementById(
+                                      `apoio-wrap-${secao.id}`
+                                    );
                                     if (wrap) wrap.style.display = "block";
                                   }}
                                 />
@@ -2771,7 +2866,9 @@ const Home = ({ isEditMode = false }) => {
                                   value="nao"
                                   defaultChecked
                                   onChange={() => {
-                                    const wrap = document.getElementById(`apoio-wrap-${secao.id}`);
+                                    const wrap = document.getElementById(
+                                      `apoio-wrap-${secao.id}`
+                                    );
                                     if (wrap) wrap.style.display = "none";
                                   }}
                                 />
@@ -2787,13 +2884,14 @@ const Home = ({ isEditMode = false }) => {
                           className="form-field"
                         >
                           <label>Se sim, especifique</label>
-                          <textarea name="apoio_especificacao" rows="3" placeholder="Descreva o apoio necessário" />
+                          <textarea
+                            name="apoio_especificacao"
+                            rows="3"
+                            placeholder="Descreva o apoio necessário"
+                          />
                         </div>
 
-                        <div
-                          className="form-actions"
-                          style={{ marginTop: 10 }}
-                        >
+                        <div className="form-actions" style={{ marginTop: 10 }}>
                           <button type="submit" className="btn-save">
                             Enviar inscrição Creche
                           </button>
@@ -2820,7 +2918,8 @@ const Home = ({ isEditMode = false }) => {
                             nif: form.nif.value,
                             niss: form.niss.value,
                             numero_utente: form.numero_utente.value,
-                            contacto_nome_completo: form.contacto_nome_completo.value,
+                            contacto_nome_completo:
+                              form.contacto_nome_completo.value,
                             contacto_telefone: form.contacto_telefone.value,
                             contacto_email: form.contacto_email.value,
                             contacto_parentesco: form.contacto_parentesco.value,
@@ -2851,14 +2950,15 @@ const Home = ({ isEditMode = false }) => {
                             return;
                           }
 
-                              setCrecheSelecao((prev) => ({
-                                ...prev,
-                                [secao.id]: crecheOptionsWithAmbas[0]?.id || "ambas",
-                              }));
-                              setCrecheNasceuState((prev) => ({
-                                ...prev,
-                                [secao.id]: undefined,
-                              }));
+                          setCrecheSelecao((prev) => ({
+                            ...prev,
+                            [secao.id]:
+                              crecheOptionsWithAmbas[0]?.id || "ambas",
+                          }));
+                          setCrecheNasceuState((prev) => ({
+                            ...prev,
+                            [secao.id]: undefined,
+                          }));
                           try {
                             const resp = await api.post(
                               "/forms/centro-de-dia",
@@ -2991,9 +3091,7 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label htmlFor={`nif-${secao.id}`}>
-                              NIF
-                            </label>
+                            <label htmlFor={`nif-${secao.id}`}>NIF</label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
                               <input
@@ -3008,9 +3106,7 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label htmlFor={`niss-${secao.id}`}>
-                              NISS
-                            </label>
+                            <label htmlFor={`niss-${secao.id}`}>NISS</label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
                               <input
@@ -3039,7 +3135,9 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label htmlFor={`contacto_nome_completo-${secao.id}`}>
+                            <label
+                              htmlFor={`contacto_nome_completo-${secao.id}`}
+                            >
                               Nome do contacto
                             </label>
                             <div className="input-with-icon">
@@ -3112,10 +3210,7 @@ const Home = ({ isEditMode = false }) => {
                           />
                         </div>
 
-                        <div
-                          className="form-actions"
-                          style={{ marginTop: 10 }}
-                        >
+                        <div className="form-actions" style={{ marginTop: 10 }}>
                           <button type="submit" className="btn-save">
                             Enviar inscrição Centro de Dia
                           </button>
@@ -3143,47 +3238,46 @@ const Home = ({ isEditMode = false }) => {
                             nif: form.nif.value,
                             niss: form.niss.value,
                             numero_utente: form.numero_utente.value,
-                            contacto_nome_completo: form.contacto_nome_completo.value,
+                            contacto_nome_completo:
+                              form.contacto_nome_completo.value,
                             contacto_telefone: form.contacto_telefone.value,
                             contacto_email: form.contacto_email.value,
                             contacto_parentesco: form.contacto_parentesco.value,
                             observacoes: form.observacoes.value,
                             higiene_pessoal: form.higiene_pessoal.checked,
-                            higiene_habitacional: form.higiene_habitacional.checked,
+                            higiene_habitacional:
+                              form.higiene_habitacional.checked,
                             refeicoes: form.refeicoes.checked,
                             tratamento_roupa: form.tratamento_roupa.checked,
-                            periodicidade_higiene_pessoal:
-                              form.higiene_pessoal.checked
-                                ? form.periodicidade_higiene_pessoal.value
-                                : "",
-                            vezes_higiene_pessoal:
-                              form.higiene_pessoal.checked
-                                ? form.vezes_higiene_pessoal.value
-                                : "",
-                            periodicidade_higiene_habitacional:
-                              form.higiene_habitacional.checked
-                                ? form.periodicidade_higiene_habitacional.value
-                                : "",
-                            vezes_higiene_habitacional:
-                              form.higiene_habitacional.checked
-                                ? form.vezes_higiene_habitacional.value
-                                : "",
-                            periodicidade_refeicoes:
-                              form.refeicoes.checked
-                                ? form.periodicidade_refeicoes.value
-                                : "",
-                            vezes_refeicoes:
-                              form.refeicoes.checked
-                                ? form.vezes_refeicoes.value
-                                : "",
-                            periodicidade_tratamento_roupa:
-                              form.tratamento_roupa.checked
-                                ? form.periodicidade_tratamento_roupa.value
-                                : "",
-                            vezes_tratamento_roupa:
-                              form.tratamento_roupa.checked
-                                ? form.vezes_tratamento_roupa.value
-                                : "",
+                            periodicidade_higiene_pessoal: form.higiene_pessoal
+                              .checked
+                              ? form.periodicidade_higiene_pessoal.value
+                              : "",
+                            vezes_higiene_pessoal: form.higiene_pessoal.checked
+                              ? form.vezes_higiene_pessoal.value
+                              : "",
+                            periodicidade_higiene_habitacional: form
+                              .higiene_habitacional.checked
+                              ? form.periodicidade_higiene_habitacional.value
+                              : "",
+                            vezes_higiene_habitacional: form
+                              .higiene_habitacional.checked
+                              ? form.vezes_higiene_habitacional.value
+                              : "",
+                            periodicidade_refeicoes: form.refeicoes.checked
+                              ? form.periodicidade_refeicoes.value
+                              : "",
+                            vezes_refeicoes: form.refeicoes.checked
+                              ? form.vezes_refeicoes.value
+                              : "",
+                            periodicidade_tratamento_roupa: form
+                              .tratamento_roupa.checked
+                              ? form.periodicidade_tratamento_roupa.value
+                              : "",
+                            vezes_tratamento_roupa: form.tratamento_roupa
+                              .checked
+                              ? form.vezes_tratamento_roupa.value
+                              : "",
                             origem_submissao: "site-secao-personalizada",
                             secao_personalizada_id: secao.id,
                             formulario_escolhido:
@@ -3339,9 +3433,7 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label htmlFor={`nif-${secao.id}`}>
-                              NIF
-                            </label>
+                            <label htmlFor={`nif-${secao.id}`}>NIF</label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
                               <input
@@ -3356,9 +3448,7 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label htmlFor={`niss-${secao.id}`}>
-                              NISS
-                            </label>
+                            <label htmlFor={`niss-${secao.id}`}>NISS</label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
                               <input
@@ -3387,7 +3477,9 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label htmlFor={`contacto_nome_completo-${secao.id}`}>
+                            <label
+                              htmlFor={`contacto_nome_completo-${secao.id}`}
+                            >
                               Nome do contacto
                             </label>
                             <div className="input-with-icon">
@@ -3472,7 +3564,10 @@ const Home = ({ isEditMode = false }) => {
                                   const wrap = document.getElementById(
                                     `wrap-higiene_pessoal-${secao.id}`
                                   );
-                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                  if (wrap)
+                                    wrap.style.display = e.target.checked
+                                      ? "block"
+                                      : "none";
                                 }}
                               />
                               Higiene pessoal
@@ -3488,7 +3583,10 @@ const Home = ({ isEditMode = false }) => {
                                   const wrap = document.getElementById(
                                     `wrap-higiene_habitacional-${secao.id}`
                                   );
-                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                  if (wrap)
+                                    wrap.style.display = e.target.checked
+                                      ? "block"
+                                      : "none";
                                 }}
                               />
                               Higiene habitacional
@@ -3507,7 +3605,10 @@ const Home = ({ isEditMode = false }) => {
                                   const wrap = document.getElementById(
                                     `wrap-refeicoes-${secao.id}`
                                   );
-                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                  if (wrap)
+                                    wrap.style.display = e.target.checked
+                                      ? "block"
+                                      : "none";
                                 }}
                               />
                               Refeições
@@ -3523,7 +3624,10 @@ const Home = ({ isEditMode = false }) => {
                                   const wrap = document.getElementById(
                                     `wrap-tratamento_roupa-${secao.id}`
                                   );
-                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                  if (wrap)
+                                    wrap.style.display = e.target.checked
+                                      ? "block"
+                                      : "none";
                                 }}
                               />
                               Tratamento de roupa
@@ -3539,7 +3643,9 @@ const Home = ({ isEditMode = false }) => {
                         >
                           <div className="form-row">
                             <div className="form-field">
-                              <label htmlFor={`periodicidade_higiene_pessoal-${secao.id}`}>
+                              <label
+                                htmlFor={`periodicidade_higiene_pessoal-${secao.id}`}
+                              >
                                 Periodicidade (Higiene pessoal)
                               </label>
                               <select
@@ -3548,13 +3654,21 @@ const Home = ({ isEditMode = false }) => {
                                 defaultValue=""
                               >
                                 <option value="">Selecione</option>
-                                <option value="segunda a sexta">Segunda a sexta</option>
-                                <option value="segunda a sabado">Segunda a sábado</option>
-                                <option value="segunda a domingo">Segunda a domingo</option>
+                                <option value="segunda a sexta">
+                                  Segunda a sexta
+                                </option>
+                                <option value="segunda a sabado">
+                                  Segunda a sábado
+                                </option>
+                                <option value="segunda a domingo">
+                                  Segunda a domingo
+                                </option>
                               </select>
                             </div>
                             <div className="form-field">
-                              <label htmlFor={`vezes_higiene_pessoal-${secao.id}`}>
+                              <label
+                                htmlFor={`vezes_higiene_pessoal-${secao.id}`}
+                              >
                                 Vezes por dia (Higiene pessoal)
                               </label>
                               <input
@@ -3576,7 +3690,9 @@ const Home = ({ isEditMode = false }) => {
                         >
                           <div className="form-row">
                             <div className="form-field">
-                              <label htmlFor={`periodicidade_higiene_habitacional-${secao.id}`}>
+                              <label
+                                htmlFor={`periodicidade_higiene_habitacional-${secao.id}`}
+                              >
                                 Periodicidade (Higiene habitacional)
                               </label>
                               <select
@@ -3585,13 +3701,21 @@ const Home = ({ isEditMode = false }) => {
                                 defaultValue=""
                               >
                                 <option value="">Selecione</option>
-                                <option value="segunda a sexta">Segunda a sexta</option>
-                                <option value="segunda a sabado">Segunda a sábado</option>
-                                <option value="segunda a domingo">Segunda a domingo</option>
+                                <option value="segunda a sexta">
+                                  Segunda a sexta
+                                </option>
+                                <option value="segunda a sabado">
+                                  Segunda a sábado
+                                </option>
+                                <option value="segunda a domingo">
+                                  Segunda a domingo
+                                </option>
                               </select>
                             </div>
                             <div className="form-field">
-                              <label htmlFor={`vezes_higiene_habitacional-${secao.id}`}>
+                              <label
+                                htmlFor={`vezes_higiene_habitacional-${secao.id}`}
+                              >
                                 Vezes por dia (Higiene habitacional)
                               </label>
                               <input
@@ -3613,7 +3737,9 @@ const Home = ({ isEditMode = false }) => {
                         >
                           <div className="form-row">
                             <div className="form-field">
-                              <label htmlFor={`periodicidade_refeicoes-${secao.id}`}>
+                              <label
+                                htmlFor={`periodicidade_refeicoes-${secao.id}`}
+                              >
                                 Periodicidade (Refeições)
                               </label>
                               <select
@@ -3622,9 +3748,15 @@ const Home = ({ isEditMode = false }) => {
                                 defaultValue=""
                               >
                                 <option value="">Selecione</option>
-                                <option value="segunda a sexta">Segunda a sexta</option>
-                                <option value="segunda a sabado">Segunda a sábado</option>
-                                <option value="segunda a domingo">Segunda a domingo</option>
+                                <option value="segunda a sexta">
+                                  Segunda a sexta
+                                </option>
+                                <option value="segunda a sabado">
+                                  Segunda a sábado
+                                </option>
+                                <option value="segunda a domingo">
+                                  Segunda a domingo
+                                </option>
                               </select>
                             </div>
                             <div className="form-field">
@@ -3650,7 +3782,9 @@ const Home = ({ isEditMode = false }) => {
                         >
                           <div className="form-row">
                             <div className="form-field">
-                              <label htmlFor={`periodicidade_tratamento_roupa-${secao.id}`}>
+                              <label
+                                htmlFor={`periodicidade_tratamento_roupa-${secao.id}`}
+                              >
                                 Periodicidade (Tratamento de roupa)
                               </label>
                               <select
@@ -3659,13 +3793,21 @@ const Home = ({ isEditMode = false }) => {
                                 defaultValue=""
                               >
                                 <option value="">Selecione</option>
-                                <option value="segunda a sexta">Segunda a sexta</option>
-                                <option value="segunda a sabado">Segunda a sábado</option>
-                                <option value="segunda a domingo">Segunda a domingo</option>
+                                <option value="segunda a sexta">
+                                  Segunda a sexta
+                                </option>
+                                <option value="segunda a sabado">
+                                  Segunda a sábado
+                                </option>
+                                <option value="segunda a domingo">
+                                  Segunda a domingo
+                                </option>
                               </select>
                             </div>
                             <div className="form-field">
-                              <label htmlFor={`vezes_tratamento_roupa-${secao.id}`}>
+                              <label
+                                htmlFor={`vezes_tratamento_roupa-${secao.id}`}
+                              >
                                 Vezes por dia (Tratamento de roupa)
                               </label>
                               <input
@@ -3680,10 +3822,7 @@ const Home = ({ isEditMode = false }) => {
                           </div>
                         </div>
 
-                        <div
-                          className="form-actions"
-                          style={{ marginTop: 10 }}
-                        >
+                        <div className="form-actions" style={{ marginTop: 10 }}>
                           <button type="submit" className="btn-save">
                             Enviar inscrição SAD
                           </button>
@@ -4069,6 +4208,107 @@ const Home = ({ isEditMode = false }) => {
 
               {editingSection === "hero" && (
                 <>
+                  <div className="cover-image-upload">
+                    <label>
+                      <strong>Imagem de Fundo:</strong>
+                      <div className="cover-preview-row">
+                        {editingData.imagem_fundo ? (
+                          <img
+                            src={editingData.imagem_fundo}
+                            alt="Fundo"
+                            className="cover-preview"
+                            onError={(e) => {
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        ) : (
+                          <div className="cover-placeholder">
+                            Nenhuma imagem de fundo
+                          </div>
+                        )}
+                        <div className="cover-actions">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const f = e.target.files[0];
+                              if (f) {
+                                try {
+                                  const formData = new FormData();
+                                  formData.append("file", f);
+                                  formData.append("tabela_referencia", "hero");
+                                  const response = await api.post(
+                                    "/media",
+                                    formData,
+                                    {
+                                      headers: {
+                                        "Content-Type": "multipart/form-data",
+                                      },
+                                    }
+                                  );
+                                  let url = response.data?.data?.url;
+                                  if (!url)
+                                    throw new Error("Upload não retornou URL");
+                                  const base =
+                                    api.defaults.baseURL?.replace(
+                                      /\/api\/?$/,
+                                      ""
+                                    ) || "";
+                                  url = url.startsWith("http")
+                                    ? url
+                                    : `${base}${url}`;
+                                  setEditingData({
+                                    ...editingData,
+                                    imagem_fundo: url,
+                                  });
+                                } catch (err) {
+                                  console.error("Erro ao enviar imagem:", err);
+                                  alert("Erro ao enviar imagem.");
+                                }
+                              }
+                            }}
+                          />
+                          <small className="hint">
+                            Enviar imagem de fundo (recomendado: 1920x1080px)
+                          </small>
+                          {editingData.imagem_fundo && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingData({
+                                  ...editingData,
+                                  imagem_fundo: "",
+                                })
+                              }
+                              className="btn-remove-image"
+                            >
+                              Remover imagem
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <label>
+                    <strong>Ou inserir URL da imagem:</strong>
+                    <input
+                      type="url"
+                      value={editingData.imagem_fundo || ""}
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          imagem_fundo: e.target.value,
+                        })
+                      }
+                      placeholder="https://exemplo.com/imagem.jpg"
+                    />
+                    <small className="hint">
+                      Cole o endereço completo da imagem (deve começar com
+                      http:// ou https://)
+                    </small>
+                  </label>
+
                   <label>
                     <strong>Título Principal:</strong>
                     <input
