@@ -119,7 +119,73 @@
   gap: 8px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  margin-bottom: 20px;
+}
+
+/* Ações no cabeçalho da dashboard (ex: voltar + nova seção) */
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-actions .btn-back,
+.dashboard-actions .btn-primary {
+  height: 44px;
+  padding: 10px 20px;
+  align-items: center;
+  display: inline-flex;
+}
+
+/* Botões de ação das listas (ex: seções personalizadas) */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-buttons button {
+  min-width: 42px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-buttons .btn-edit {
+  background: #eef4ff;
+  border-color: #d4defc;
+  color: #2c3e50;
+}
+
+.action-buttons .btn-edit:hover {
+  background: #dbe6ff;
+}
+
+.action-buttons .btn-view {
+  background: #e8f8f3;
+  border-color: #c6eee1;
+  color: #0c6b4d;
+}
+
+.action-buttons .btn-view:hover {
+  background: #d4f1e8;
+}
+
+.action-buttons .btn-delete {
+  background: #fff5f5;
+  border-color: #ffc5c7;
+  color: #c0392b;
+}
+
+.action-buttons .btn-delete:hover {
+  background: #ffd9dc;
 }
 
 .btn-back:hover {

@@ -1,0 +1,164 @@
+.inscriptions-page {
+  padding: 20px;
+}
+
+.inscriptions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.inscriptions-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.inscriptions-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inscriptions-options .form-option-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.inscriptions-options .form-option-card input {
+  width: 18px;
+  height: 18px;
+  accent-color: #f97316;
+}
+
+.inscriptions-options .form-option-card.selected {
+  border-color: #f97316;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+}
+
+.inscriptions-options .form-option-card:hover {
+  border-color: #cbd5e1;
+}
+
+.inscriptions-table-wrapper {
+  overflow-x: auto;
+}
+
+.inscriptions-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+.inscriptions-table th,
+.inscriptions-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.inscriptions-table td .btn-small + .btn-small {
+  margin-left: 8px;
+}
+
+.inscriptions-table th {
+  background: #f8f9fb;
+  font-weight: 700;
+}
+
+.inscriptions-table tr:hover {
+  background: #f5f7fb;
+}
+
+.btn-refresh {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btn-small {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btn-small.btn-delete {
+  border-color: #ffc5c7;
+  color: #c0392b;
+  background: #fff5f5;
+}
+
+.btn-small.btn-delete:hover {
+  background: #ffd9dc;
+}
+
+.btn-delete {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ffc5c7;
+  background: #fff5f5;
+  color: #c0392b;
+  cursor: pointer;
+}
+
+.btn-delete:hover {
+  background: #ffd9dc;
+}
+
+.inscriptions-table tr.unread {
+  background: #fff9f4;
+}
+
+.inscriptions-table tr.unread:hover {
+  background: #ffeede;
+}
+
+.inscription-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.inscription-modal-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 560px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  gap: 8px;
+}
+
+.obs-box {
+  padding: 10px;
+  background: #f8f9fb;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}

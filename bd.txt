@@ -1,0 +1,146 @@
+-- ERPI
+CREATE TABLE forms_erpi (
+  id SERIAL PRIMARY KEY,
+  nome_completo           TEXT NOT NULL,
+  data_nascimento         DATE NOT NULL,
+  morada_completa         TEXT NOT NULL,
+  codigo_postal           VARCHAR(20) NOT NULL,
+  concelho                TEXT NOT NULL,
+  distrito                TEXT NOT NULL,
+  cc_bi_numero            VARCHAR(50) NOT NULL,
+  nif                     VARCHAR(50) NOT NULL,
+  niss                    VARCHAR(50) NOT NULL,
+  numero_utente           VARCHAR(50) NOT NULL,
+  contacto_nome_completo  TEXT NOT NULL,
+  contacto_telefone       VARCHAR(30) NOT NULL,
+  contacto_email          TEXT NOT NULL,
+  contacto_parentesco     TEXT NOT NULL,
+  observacoes             TEXT,
+  criado_em               TIMESTAMPTZ DEFAULT now()
+);
+
+-- Centro de Dia
+CREATE TABLE forms_centro_de_dia (
+  id SERIAL PRIMARY KEY,
+  nome_completo           TEXT NOT NULL,
+  data_nascimento         DATE NOT NULL,
+  morada_completa         TEXT NOT NULL,
+  codigo_postal           VARCHAR(20) NOT NULL,
+  concelho                TEXT NOT NULL,
+  distrito                TEXT NOT NULL,
+  cc_bi_numero            VARCHAR(50) NOT NULL,
+  nif                     VARCHAR(50) NOT NULL,
+  niss                    VARCHAR(50) NOT NULL,
+  numero_utente           VARCHAR(50) NOT NULL,
+  contacto_nome_completo  TEXT NOT NULL,
+  contacto_telefone       VARCHAR(30) NOT NULL,
+  contacto_email          TEXT NOT NULL,
+  contacto_parentesco     TEXT NOT NULL,
+  observacoes             TEXT,
+  criado_em               TIMESTAMPTZ DEFAULT now()
+);
+
+-- Serviço de Apoio Domiciliário (SAD)
+CREATE TABLE forms_sad (
+  id SERIAL PRIMARY KEY,
+  nome_completo           TEXT NOT NULL,
+  data_nascimento         DATE NOT NULL,
+  morada_completa         TEXT NOT NULL,
+  codigo_postal           VARCHAR(20) NOT NULL,
+  concelho                TEXT NOT NULL,
+  distrito                TEXT NOT NULL,
+  cc_bi_numero            VARCHAR(50) NOT NULL,
+  nif                     VARCHAR(50) NOT NULL,
+  niss                    VARCHAR(50) NOT NULL,
+  numero_utente           VARCHAR(50) NOT NULL,
+  contacto_nome_completo  TEXT NOT NULL,
+  contacto_telefone       VARCHAR(30) NOT NULL,
+  contacto_email          TEXT NOT NULL,
+  contacto_parentesco     TEXT NOT NULL,
+  observacoes             TEXT,
+
+  -- Serviços marcados
+  higiene_pessoal         BOOLEAN DEFAULT FALSE,
+  higiene_habitacional    BOOLEAN DEFAULT FALSE,
+  refeicoes               BOOLEAN DEFAULT FALSE,
+  tratamento_roupa        BOOLEAN DEFAULT FALSE,
+
+  -- Opções quando assinalar serviços (por serviço)
+  periodicidade_higiene_pessoal        VARCHAR(30),
+  vezes_higiene_pessoal               INTEGER,
+  periodicidade_higiene_habitacional  VARCHAR(30),
+  vezes_higiene_habitacional          INTEGER,
+  periodicidade_refeicoes             VARCHAR(30),
+  vezes_refeicoes                     INTEGER,
+  periodicidade_tratamento_roupa      VARCHAR(30),
+  vezes_tratamento_roupa              INTEGER,
+
+  criado_em               TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT chk_sad_periodicidade
+    CHECK (
+      (periodicidade_higiene_pessoal IS NULL OR periodicidade_higiene_pessoal IN ('segunda a sexta','segunda a sabado','segunda a domingo')) AND
+      (periodicidade_higiene_habitacional IS NULL OR periodicidade_higiene_habitacional IN ('segunda a sexta','segunda a sabado','segunda a domingo')) AND
+      (periodicidade_refeicoes IS NULL OR periodicidade_refeicoes IN ('segunda a sexta','segunda a sabado','segunda a domingo')) AND
+      (periodicidade_tratamento_roupa IS NULL OR periodicidade_tratamento_roupa IN ('segunda a sexta','segunda a sabado','segunda a domingo'))
+    ),
+  CONSTRAINT chk_sad_vezes
+    CHECK (
+      (vezes_higiene_pessoal IS NULL OR vezes_higiene_pessoal BETWEEN 1 AND 5) AND
+      (vezes_higiene_habitacional IS NULL OR vezes_higiene_habitacional BETWEEN 1 AND 5) AND
+      (vezes_refeicoes IS NULL OR vezes_refeicoes BETWEEN 1 AND 5) AND
+      (vezes_tratamento_roupa IS NULL OR vezes_tratamento_roupa BETWEEN 1 AND 5)
+    )
+);
+
+-- Índices simples (opcionais) para buscas por NIF e data
+CREATE INDEX idx_forms_erpi_nif ON forms_erpi (nif);
+CREATE INDEX idx_forms_centro_nif ON forms_centro_de_dia (nif);
+CREATE INDEX idx_forms_sad_nif ON forms_sad (nif);
+CREATE INDEX idx_forms_erpi_data ON forms_erpi (data_nascimento);
+CREATE INDEX idx_forms_centro_data ON forms_centro_de_dia (data_nascimento);
+CREATE INDEX idx_forms_sad_data ON forms_sad (data_nascimento);
+
+-- Creche
+CREATE TABLE forms_creche (
+  id SERIAL PRIMARY KEY,
+  creche_opcao           TEXT,
+  creche_item_id         INTEGER,
+  nome_completo          TEXT NOT NULL,
+  morada                 TEXT NOT NULL,
+  codigo_postal          VARCHAR(20) NOT NULL,
+  localidade             TEXT NOT NULL,
+  crianca_nasceu         BOOLEAN NOT NULL,
+  data_nascimento        DATE,
+  data_prevista          DATE,
+  cc_bi_numero           VARCHAR(50),
+  nif                    VARCHAR(50),
+  niss                   VARCHAR(50),
+  numero_utente          VARCHAR(50),
+
+  mae_nome               TEXT,
+  mae_profissao          TEXT,
+  mae_local_emprego      TEXT,
+  mae_morada             TEXT,
+  mae_codigo_postal      VARCHAR(20),
+  mae_localidade         TEXT,
+  mae_telemovel          VARCHAR(30),
+  mae_email              TEXT,
+
+  pai_nome               TEXT,
+  pai_profissao          TEXT,
+  pai_local_emprego      TEXT,
+  pai_morada             TEXT,
+  pai_codigo_postal      VARCHAR(20),
+  pai_localidade         TEXT,
+  pai_telemovel          VARCHAR(30),
+  pai_email              TEXT,
+
+  irmaos_frequentam      BOOLEAN,
+  necessita_apoio        BOOLEAN,
+  apoio_especificacao    TEXT,
+  criado_em              TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_forms_creche_nif ON forms_creche (nif);
+CREATE INDEX idx_forms_creche_data ON forms_creche (data_nascimento);

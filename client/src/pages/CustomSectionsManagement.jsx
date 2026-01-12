@@ -12,6 +12,27 @@ function CustomSectionsManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingSecao, setEditingSecao] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
+  const FORM_TYPES = [
+    { id: "contacto", label: "Formulário de contacto" },
+    { id: "erpi", label: "Inscrição ERPI" },
+    { id: "centro_de_dia", label: "Inscrição Centro de Dia" },
+    { id: "sad", label: "Inscrição SAD" },
+    { id: "creche", label: "Inscrição Creche" },
+  ];
+  const labelForFormType = (tipo) => {
+    const found = FORM_TYPES.find((t) => t.id === tipo);
+    return found ? found.label : tipo?.toUpperCase() || "Formulário";
+  };
+  const normalizeFormOptions = (opcoes = [], prefix = "opt") => {
+    return opcoes.map((opt, idx) => {
+      const tipo = opt?.tipo || opt?.id || opt?.value || opt || "contacto";
+      return {
+        id: opt?.id || `${prefix}-${idx}-${Date.now()}`,
+        tipo,
+        label: opt?.label || labelForFormType(tipo),
+      };
+    });
+  };
   const [formData, setFormData] = useState({
     nome: "",
     titulo: "",
@@ -19,7 +40,22 @@ function CustomSectionsManagement() {
     descricao: "",
     tipo_layout: "cards",
     tem_formulario: false,
+    tipo_formulario: "nenhum",
+    formulario_opcoes: [],
+    formulario_titulo: "Escolha o formulário",
+    formulario_descricao: "",
   });
+
+  const parseFormConfig = (config) => {
+    if (!config) return null;
+    if (typeof config === "object") return config;
+    try {
+      return JSON.parse(config);
+    } catch (e) {
+      console.warn("Configuração de formulário inválida", e);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -47,13 +83,27 @@ function CustomSectionsManagement() {
   const handleOpenModal = (secao = null) => {
     if (secao) {
       setEditingSecao(secao);
+      const cfg = parseFormConfig(secao.config_formulario);
+      const isMultiple = cfg?.tipo === "multiple";
+      const optionsFromCfg = isMultiple
+        ? normalizeFormOptions(cfg?.opcoes || [], `cfg-${secao.id || "secao"}`)
+        : [];
       setFormData({
         nome: secao.nome,
         titulo: secao.titulo,
         slug: secao.slug,
         descricao: secao.descricao || "",
         tipo_layout: secao.tipo_layout || "cards",
-        tem_formulario: secao.tem_formulario || false,
+        tem_formulario:
+          isMultiple || cfg?.tipo === "contacto" || cfg?.tipo === "erpi"
+            ? true
+            : secao.tem_formulario || false,
+        tipo_formulario: isMultiple
+          ? "multiple"
+          : cfg?.tipo || (secao.tem_formulario ? "contacto" : "nenhum"),
+        formulario_opcoes: optionsFromCfg,
+        formulario_titulo: cfg?.titulo || "Escolha o formulário",
+        formulario_descricao: cfg?.descricao || "",
       });
     } else {
       setEditingSecao(null);
@@ -64,6 +114,10 @@ function CustomSectionsManagement() {
         descricao: "",
         tipo_layout: "cards",
         tem_formulario: false,
+        tipo_formulario: "nenhum",
+        formulario_opcoes: [],
+        formulario_titulo: "Escolha o formulário",
+        formulario_descricao: "",
       });
     }
     setShowModal(true);
@@ -71,14 +125,52 @@ function CustomSectionsManagement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const {
+      tipo_formulario,
+      formulario_opcoes,
+      formulario_titulo,
+      formulario_descricao,
+      ...rest
+    } = formData;
+
+    let config_formulario = null;
+
+    if (tipo_formulario === "multiple") {
+      const opcoesLimpa = (formulario_opcoes || [])
+        .filter((opt) => opt?.tipo)
+        .map((opt, idx) => ({
+          tipo: opt.tipo,
+          label: opt.label?.trim() || labelForFormType(opt.tipo) || `Opção ${idx + 1}`,
+        }));
+
+      if (opcoesLimpa.length === 0) {
+        alert("Adicione pelo menos uma opção de formulário.");
+        return;
+      }
+
+      config_formulario = {
+        tipo: "multiple",
+        opcoes: opcoesLimpa,
+        titulo: formulario_titulo?.trim() || "Escolha o formulário",
+        descricao: formulario_descricao?.trim() || "",
+      };
+    } else if (tipo_formulario !== "nenhum") {
+      config_formulario = { tipo: tipo_formulario };
+    }
+
+    const payload = {
+      ...rest,
+      tem_formulario: tipo_formulario !== "nenhum",
+      config_formulario,
+    };
     try {
       if (editingSecao) {
         // Atualizar
-        await api.put(`/secoes-personalizadas/${editingSecao.id}`, formData);
+        await api.put(`/secoes-personalizadas/${editingSecao.id}`, payload);
         alert("Seção atualizada com sucesso!");
       } else {
         // Criar
-        await api.post("/secoes-personalizadas", formData);
+        await api.post("/secoes-personalizadas", payload);
         alert("Seção criada com sucesso!");
       }
       setShowModal(false);
@@ -156,6 +248,36 @@ function CustomSectionsManagement() {
     setFormData({ ...formData, slug });
   };
 
+  const handleAddFormOption = () => {
+    setFormData((prev) => ({
+      ...prev,
+      formulario_opcoes: [
+        ...prev.formulario_opcoes,
+        {
+          id: `opt-${Date.now()}`,
+          tipo: "erpi",
+          label: "Nova opção",
+        },
+      ],
+    }));
+  };
+
+  const handleUpdateFormOption = (id, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      formulario_opcoes: prev.formulario_opcoes.map((opt) =>
+        opt.id === id ? { ...opt, [field]: value } : opt
+      ),
+    }));
+  };
+
+  const handleRemoveFormOption = (id) => {
+    setFormData((prev) => ({
+      ...prev,
+      formulario_opcoes: prev.formulario_opcoes.filter((opt) => opt.id !== id),
+    }));
+  };
+
   if (loading) {
     return (
       <div className="dashboard-content">
@@ -231,11 +353,26 @@ function CustomSectionsManagement() {
                     <span className="badge">{secao.tipo_layout}</span>
                   </td>
                   <td>
-                    {secao.tem_formulario ? (
-                      <span className="badge badge-success">Sim</span>
-                    ) : (
-                      <span className="badge badge-secondary">Não</span>
-                    )}
+                    {(() => {
+                      const cfg = parseFormConfig(secao.config_formulario);
+                      const formType = cfg?.tipo || (secao.tem_formulario ? "contacto" : "nenhum");
+
+                      if (!formType || formType === "nenhum") {
+                        return <span className="badge badge-secondary">Não</span>;
+                      }
+
+                      if (formType === "multiple") {
+                        const total = Array.isArray(cfg?.opcoes) ? cfg.opcoes.length : 0;
+                        return (
+                          <span className="badge badge-success">
+                            Múltiplos {total ? `(${total})` : ""}
+                          </span>
+                        );
+                      }
+
+                      const label = cfg?.label || labelForFormType(formType);
+                      return <span className="badge badge-success">{label}</span>;
+                    })()}
                   </td>
                   <td>
                     <div className="action-buttons">
@@ -608,25 +745,137 @@ function CustomSectionsManagement() {
                   </div>
                 </label>
 
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={formData.tem_formulario}
+                <label>
+                  <strong>Incluir formulário:</strong>
+                  <select
+                    value={formData.tipo_formulario}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        tem_formulario: e.target.checked,
+                        tipo_formulario: e.target.value,
+                        tem_formulario: e.target.value !== "nenhum",
+                        formulario_opcoes:
+                          e.target.value === "multiple"
+                            ? formData.formulario_opcoes.length > 0
+                              ? formData.formulario_opcoes
+                              : [
+                                  {
+                                    id: `opt-${Date.now()}`,
+                                    tipo: "erpi",
+                                    label: "Inscrição ERPI",
+                                  },
+                                  {
+                                    id: `opt-${Date.now()}-2`,
+                                    tipo: "contacto",
+                                    label: "Formulário de contacto",
+                                  },
+                                ]
+                            : formData.formulario_opcoes,
                       })
                     }
-                  />
-                  <strong>Incluir formulário de contacto</strong>
+                  >
+                    <option value="nenhum">Nenhum</option>
+                    <option value="contacto">Formulário de contacto</option>
+                    <option value="erpi">Formulário ERPI</option>
+                    <option value="centro_de_dia">Formulário Centro de Dia</option>
+                    <option value="sad">Formulário SAD</option>
+                    <option value="creche">Formulário Creche</option>
+                    <option value="multiple">Vários formulários</option>
+                  </select>
+                  <small className="hint">
+                    Escolha um ou vários formulários. Em "Vários formulários"
+                    pode definir rótulos diferentes (ex: ERPI, CD, SAD,
+                    Creche) e reutilizar o mesmo tipo de formulário.
+                  </small>
                 </label>
+
+                {formData.tipo_formulario === "multiple" && (
+                  <div className="form-options-config">
+                    <label>
+                      <strong>Título do seletor (opcional):</strong>
+                      <input
+                        type="text"
+                        value={formData.formulario_titulo}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            formulario_titulo: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: Escolha o serviço"
+                      />
+                    </label>
+
+                    <label>
+                      <strong>Descrição curta (opcional):</strong>
+                      <textarea
+                        rows="2"
+                        value={formData.formulario_descricao}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            formulario_descricao: e.target.value,
+                          })
+                        }
+                        placeholder="Texto que aparece por baixo do seletor"
+                      />
+                    </label>
+
+                    <div className="options-list">
+                      <div className="options-list-header">
+                        <strong>Opções de formulário</strong>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={handleAddFormOption}
+                        >
+                          ➕ Adicionar opção
+                        </button>
+                      </div>
+
+                      {formData.formulario_opcoes.length === 0 && (
+                        <p className="hint">Adicione pelo menos uma opção.</p>
+                      )}
+
+                      {formData.formulario_opcoes.map((opt) => (
+                        <div key={opt.id} className="option-row">
+                          <select
+                            value={opt.tipo}
+                            onChange={(e) =>
+                              handleUpdateFormOption(opt.id, "tipo", e.target.value)
+                            }
+                          >
+                            {FORM_TYPES.map((ft) => (
+                              <option key={ft.id} value={ft.id}>
+                                {ft.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={opt.label}
+                            onChange={(e) =>
+                              handleUpdateFormOption(opt.id, "label", e.target.value)
+                            }
+                            placeholder="Rótulo visível para o utilizador"
+                          />
+                          <button
+                            type="button"
+                            className="btn-delete"
+                            onClick={() => handleRemoveFormOption(opt.id)}
+                            title="Remover opção"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <small className="hint">
+                      Pode criar opções com o mesmo tipo de formulário mas
+                      rótulos diferentes (ex: ERPI, CD, SAD, Creche).
+                    </small>
+                  </div>
+                )}
               </div>
               <div className="edit-modal-footer">
                 <button

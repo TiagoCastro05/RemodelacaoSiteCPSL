@@ -113,6 +113,7 @@ if (fs.existsSync(uploadsPath)) {
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/contactos", require("./routes/contactos"));
+app.use("/api/forms", require("./routes/forms"));
 app.use("/api/projetos", require("./routes/projetos"));
 app.use("/api/noticias", require("./routes/noticias"));
 app.use("/api/respostas-sociais", require("./routes/respostasSociais"));

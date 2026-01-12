@@ -7,48 +7,80 @@ import ProjectsManagement from "./ProjectsManagement";
 import Home from "./Home";
 import Profile from "./Profile";
 import Messages from "./Messages";
+import Inscriptions from "./Inscriptions";
 import CustomSectionsManagement from "./CustomSectionsManagement";
 import SectionItemsManagement from "./SectionItemsManagement";
 import TransparencyManagement from "./TransparencyManagement";
 import "../styles/Dashboard.css";
 
 const Dashboard = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [unread, setUnread] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadInscriptions, setUnreadInscriptions] = useState(0);
 
   useEffect(() => {
     const fetchUnread = async () => {
       try {
         const resp = await api.get("/mensagens?respondido=false");
         if (resp.data && resp.data.success)
-          setUnread((resp.data.data || []).length);
+          setUnreadMessages((resp.data.data || []).length);
+      } catch (e) {
+        // ignore
+      }
+    };
+    const fetchUnreadInscriptions = async () => {
+      try {
+        let total = 0;
+        const endpoints = [
+          "/forms/erpi?lido=false",
+          "/forms/centro-de-dia?lido=false",
+              "/forms/sad?lido=false",
+              "/forms/creche?lido=false",
+        ];
+        for (const ep of endpoints) {
+          const resp = await api.get(ep);
+          if (resp.data && resp.data.success) {
+            total += (resp.data.data || []).length;
+          }
+        }
+        setUnreadInscriptions(total);
       } catch (e) {
         // ignore
       }
     };
     fetchUnread();
+    fetchUnreadInscriptions();
     // listen to messages updates from Messages component
     const handler = (e) => {
       if (e && e.detail && typeof e.detail.unread === "number")
-        setUnread(e.detail.unread);
+        setUnreadMessages(e.detail.unread);
     };
     const handlerServer = (e) => {
       if (e && e.detail && typeof e.detail.unread === "number")
-        setUnread(e.detail.unread);
+        setUnreadMessages(e.detail.unread);
+    };
+    const handlerInsc = (e) => {
+      if (e && e.detail && typeof e.detail.unread === "number")
+        setUnreadInscriptions(e.detail.unread);
     };
     window.addEventListener("mensagens:updated", handler);
     window.addEventListener("mensagens:server", handlerServer);
+    window.addEventListener("inscricoes:updated", handlerInsc);
 
     // also refetch when window/tab becomes visible to ensure accurate badge after background changes
     const onVisible = () => {
-      if (document.visibilityState === "visible") fetchUnread();
+      if (document.visibilityState === "visible") {
+        fetchUnread();
+        fetchUnreadInscriptions();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       window.removeEventListener("mensagens:updated", handler);
       window.removeEventListener("mensagens:server", handlerServer);
+      window.removeEventListener("inscricoes:updated", handlerInsc);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
@@ -82,7 +114,19 @@ const Dashboard = () => {
             title="Mensagens"
           >
             ✉️ Mensagens{" "}
-            {unread > 0 && <span className="badge-dot" aria-hidden="true" />}
+            {unreadMessages > 0 && (
+              <span className="badge-dot" aria-hidden="true" />
+            )}
+          </button>
+          <button
+            onClick={() => navigate("/dashboard/inscricoes")}
+            className="btn-admin-action"
+            title="Inscrições"
+          >
+            📝 Inscrições
+            {unreadInscriptions > 0 && (
+              <span className="badge-dot" aria-hidden="true" />
+            )}
           </button>
           {user?.tipo === "Admin" && (
             <button
@@ -106,6 +150,7 @@ const Dashboard = () => {
         {/* Dashboard principal agora mostra o site público com edição inline */}
         <Route path="/" element={<Home isEditMode={true} />} />
         <Route path="/mensagens" element={<Messages />} />
+    <Route path="/inscricoes" element={<Inscriptions />} />
         <Route path="/projetos" element={<ProjectsManagement />} />
         <Route path="/secoes" element={<CustomSectionsManagement />} />
         <Route

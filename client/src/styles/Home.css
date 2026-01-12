@@ -799,6 +799,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  border: 1px solid #e6e9f8;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: #fff;
 }
 .input-with-icon .input-icon {
   width: 36px;
@@ -809,19 +813,32 @@
   font-size: 16px;
   color: #667eea;
 }
-/* wrap the icon + input in a bordered control so bars look identical */
-.input-with-icon {
-  border: 1px solid #e6e9f8;
-  border-radius: 10px;
-  padding: 6px 10px;
-  background: #fff;
-}
 .input-with-icon input {
   flex: 1;
   border: none;
   padding: 8px 6px;
   font-size: 1.05rem;
   outline: none;
+}
+.input-with-icon select {
+  flex: 1;
+  border: none;
+  padding: 8px 6px;
+  font-size: 1.05rem;
+  background: transparent;
+  outline: none;
+}
+
+/* Hide icons only inside ERPI form */
+.erpi-form .input-with-icon {
+  gap: 0;
+}
+.erpi-form .input-with-icon .input-icon {
+  display: none;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
 }
 
 /* Width rules: email wider, name and subject narrower */
@@ -841,6 +858,64 @@
 
 .form-actions {
   text-align: right;
+}
+
+.form-selector {
+  margin: 0 0 18px 0;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e6e9f8;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-selector-title {
+  margin: 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.form-selector-description {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.form-selector-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.form-option-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.form-option-card input {
+  width: 18px;
+  height: 18px;
+  accent-color: #f97316;
+}
+
+.form-option-card.selected {
+  border-color: #f97316;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+}
+
+.form-option-card:hover {
+  border-color: #cbd5e1;
 }
 
 /* ensure textarea gets same visual border as inputs */

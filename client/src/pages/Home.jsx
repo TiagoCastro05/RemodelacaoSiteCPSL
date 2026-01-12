@@ -251,6 +251,71 @@ function normalizeInitialHtml(html) {
   return out;
 }
 
+// Configuração de formulário (contacto/ERPI) armazenada como JSON no backend
+const parseFormConfig = (config) => {
+  if (!config) return null;
+  if (typeof config === "object") return config;
+  try {
+    return JSON.parse(config);
+  } catch (e) {
+    console.warn("Configuração de formulário inválida", e);
+    return null;
+  }
+};
+
+const FORM_TYPE_LABELS = {
+  contacto: "Formulário de contacto",
+  erpi: "Inscrição ERPI",
+  creche: "Inscrição Creche",
+  centro_de_dia: "Inscrição Centro de Dia",
+  sad: "Inscrição SAD",
+};
+
+const POSTAL_PATTERN = "\\d{4}-\\d{3}";
+const POSTAL_TITLE = "Formato 0000-000";
+const DATE_MIN = "1900-01-01";
+const DATE_MAX = new Date().toISOString().slice(0, 10);
+const DATE_FUTURE_MAX = "2100-12-31";
+
+const normalizeFormOptions = (opcoes = []) => {
+  return opcoes
+    .filter(Boolean)
+    .map((opt, idx) => {
+      const tipo = opt?.tipo || opt?.id || opt?.value || opt;
+      return {
+        tipo,
+        label:
+          opt?.label || FORM_TYPE_LABELS[tipo] || `Formulário ${idx + 1}`,
+      };
+    });
+};
+
+const getFormConfig = (secao) => {
+  const hasForm = secao?.tem_formulario || secao?.config_formulario;
+  if (!hasForm) return null;
+
+  const cfg = parseFormConfig(secao.config_formulario);
+
+  if (cfg?.tipo === "multiple") {
+    const opcoes = normalizeFormOptions(cfg.opcoes || []);
+    if (!opcoes.length) return null;
+    return {
+      tipo: "multiple",
+      opcoes,
+      titulo: cfg.titulo || "Escolha o formulário",
+      descricao: cfg.descricao || "",
+    };
+  }
+
+  const tipo = cfg?.tipo || (secao?.tem_formulario ? "contacto" : null);
+  if (!tipo || tipo === "nenhum") return null;
+
+  return {
+    tipo,
+    label: cfg?.label || FORM_TYPE_LABELS[tipo] || tipo,
+  };
+};
+
 const Home = ({ isEditMode = false }) => {
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -279,6 +344,9 @@ const Home = ({ isEditMode = false }) => {
     useState(null);
   const [selectedCustomItem, setSelectedCustomItem] = useState(null);
   const [showCustomItemModal, setShowCustomItemModal] = useState(false);
+  const [formSelections, setFormSelections] = useState({});
+  const [crecheSelecao, setCrecheSelecao] = useState({});
+  const [crecheNasceuState, setCrecheNasceuState] = useState({});
   const lastFocusedRef = useRef(null);
   const editModalRef = useRef(null);
   const addModalRef = useRef(null);
@@ -482,7 +550,10 @@ const Home = ({ isEditMode = false }) => {
         setLoadingSecoes(true);
         const response = await api.get("/secoes-personalizadas");
         if (response.data.success) {
-          const secoes = response.data.data || [];
+          const secoes = (response.data.data || []).map((s) => ({
+            ...s,
+            config_formulario: parseFormConfig(s.config_formulario),
+          }));
           setSecoesPersonalizadas(secoes);
 
           // Buscar itens de cada seção
@@ -506,6 +577,21 @@ const Home = ({ isEditMode = false }) => {
 
     fetchSecoesPersonalizadas();
   }, []);
+
+  useEffect(() => {
+    const defaults = {};
+    secoesPersonalizadas.forEach((secao) => {
+      const cfg = getFormConfig(secao);
+      if (!cfg) return;
+      if (cfg.tipo === "multiple") {
+        const first = cfg.opcoes?.[0]?.tipo;
+        if (first) defaults[secao.id] = first;
+      } else if (cfg.tipo) {
+        defaults[secao.id] = cfg.tipo;
+      }
+    });
+    setFormSelections((prev) => ({ ...defaults, ...prev }));
+  }, [secoesPersonalizadas]);
 
   // Abrir modal de edição
   const handleEdit = (
@@ -1335,6 +1421,41 @@ const Home = ({ isEditMode = false }) => {
       {/* Seções Personalizadas */}
       {secoesPersonalizadas.map((secao) => {
         const itens = itensSecoesPersonalizadas[secao.id] || [];
+        const formConfig = getFormConfig(secao);
+        const isMultipleForm = formConfig?.tipo === "multiple";
+        const formOptions = isMultipleForm
+          ? formConfig.opcoes || []
+          : formConfig
+          ? [{ tipo: formConfig.tipo, label: formConfig.label }]
+          : [];
+        const selectedFormType = formConfig
+          ? isMultipleForm
+            ? formSelections[secao.id] || formOptions[0]?.tipo
+            : formOptions[0]?.tipo
+          : null;
+        const selectedFormLabel = formOptions.find(
+          (o) => o.tipo === selectedFormType
+        )?.label;
+
+        const crecheSections = secoesPersonalizadas.filter((s) => {
+          const key = `${s.slug || ""} ${s.nome || ""} ${s.titulo || ""}`.toLowerCase();
+          return key.includes("creche");
+        });
+        const crecheOptions = (
+          crecheSections.flatMap((s) => {
+            const items = itensSecoesPersonalizadas[s.id] || [];
+            return items.map((it, idx) => ({
+              id: it.id,
+              label: it.titulo || it.nome || `Creche ${idx + 1}`,
+            }));
+          }) || []
+        ).filter(Boolean);
+        const crecheOptionsWithAmbas = [
+          { id: "ambas", label: "Ambas" },
+          ...crecheOptions,
+        ];
+        const selectedCreche =
+          crecheSelecao[secao.id] || crecheOptionsWithAmbas[0]?.id || "ambas";
 
         return (
           <section key={secao.id} id={secao.slug} className="section">
@@ -1691,8 +1812,8 @@ const Home = ({ isEditMode = false }) => {
                 </div>
               )}
 
-              {/* Formulário de contacto se a secção tiver tem_formulario ativado */}
-              {secao.tem_formulario && (
+              {/* Formulários configuráveis por secção */}
+              {formConfig && selectedFormType && (
                 <div
                   className="contact-form"
                   style={{ marginTop: "3rem", position: "relative" }}
@@ -1707,18 +1828,19 @@ const Home = ({ isEditMode = false }) => {
                           )
                         ) {
                           try {
-                            await api.put(
-                              `/secoes-personalizadas/${secao.id}`,
-                              {
-                                ...secao,
-                                tem_formulario: false,
-                              }
-                            );
-                            // Atualizar estado local
+                            await api.put(`/secoes-personalizadas/${secao.id}`, {
+                              ...secao,
+                              tem_formulario: false,
+                              config_formulario: null,
+                            });
                             setSecoesPersonalizadas(
                               secoesPersonalizadas.map((s) =>
                                 s.id === secao.id
-                                  ? { ...s, tem_formulario: false }
+                                  ? {
+                                      ...s,
+                                      tem_formulario: false,
+                                      config_formulario: null,
+                                    }
                                   : s
                               )
                             );
@@ -1740,91 +1862,1835 @@ const Home = ({ isEditMode = false }) => {
                       🗑️
                     </button>
                   )}
-                  <h3>Envie-nos uma mensagem</h3>
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      const form = e.currentTarget;
-                      const data = {
-                        nome: form.nome.value,
-                        email: form.email.value,
-                        assunto: form.assunto.value,
-                        mensagem: form.mensagem.value,
-                        secao_personalizada_id: secao.id,
-                      };
-                      try {
-                        const resp = await api.post("/contactos/form", data);
-                        if (resp.data && resp.data.success) {
-                          alert("Mensagem enviada. Obrigado!");
-                          form.reset();
-                        } else {
-                          alert("Erro ao enviar mensagem.");
-                        }
-                      } catch (err) {
-                        console.error(err);
-                        alert("Erro ao enviar mensagem.");
-                      }
-                    }}
-                  >
-                    <div className="form-row">
-                      <div className="form-field name-field">
-                        <label htmlFor={`nome-${secao.id}`}>Nome</label>
-                        <div className="input-with-icon">
-                          <span className="input-icon">👤</span>
-                          <input
-                            id={`nome-${secao.id}`}
-                            name="nome"
-                            placeholder="Nome"
+
+                  {isMultipleForm && formOptions.length > 1 && (
+                    <div className="form-selector">
+                      <p className="form-selector-title">
+                        {formConfig.titulo || "Escolha o formulário"}
+                      </p>
+                      {formConfig.descricao && (
+                        <p className="form-selector-description">
+                          {formConfig.descricao}
+                        </p>
+                      )}
+                      <div className="form-selector-options">
+                        {formOptions.map((opt) => (
+                          <label
+                            key={opt.tipo}
+                            className={`form-option-card ${
+                              selectedFormType === opt.tipo ? "selected" : ""
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name={`form-choice-${secao.id}`}
+                              value={opt.tipo}
+                              checked={selectedFormType === opt.tipo}
+                              onChange={() =>
+                                setFormSelections((prev) => ({
+                                  ...prev,
+                                  [secao.id]: opt.tipo,
+                                }))
+                              }
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedFormType === "contacto" && (
+                    <>
+                      <h3>{selectedFormLabel || "Envie-nos uma mensagem"}</h3>
+                      <form
+                        className="erpi-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
+                          const data = {
+                            nome: form.nome.value,
+                            email: form.email.value,
+                            assunto: form.assunto.value,
+                            mensagem: form.mensagem.value,
+                            secao_personalizada_id: secao.id,
+                            formulario_escolhido:
+                              selectedFormLabel || selectedFormType,
+                          };
+                          try {
+                            const resp = await api.post(
+                              "/contactos/form",
+                              data
+                            );
+                            if (resp.data && resp.data.success) {
+                              alert("Mensagem enviada. Obrigado!");
+                              form.reset();
+                            } else {
+                              alert("Erro ao enviar mensagem.");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Erro ao enviar mensagem.");
+                          }
+                        }}
+                      >
+                        <div className="form-row">
+                          <div className="form-field name-field">
+                            <label htmlFor={`nome-${secao.id}`}>Nome</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👤</span>
+                              <input
+                                id={`nome-${secao.id}`}
+                                name="nome"
+                                placeholder="Nome"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-field email-field">
+                            <label htmlFor={`email-${secao.id}`}>
+                              Email
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">✉️</span>
+                              <input
+                                id={`email-${secao.id}`}
+                                name="email"
+                                type="email"
+                                placeholder="Email"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-field subject-field">
+                          <label htmlFor={`assunto-${secao.id}`}>
+                            Assunto
+                          </label>
+                          <div className="input-with-icon">
+                            <span className="input-icon">📝</span>
+                            <input
+                              id={`assunto-${secao.id}`}
+                              name="assunto"
+                              placeholder="Assunto"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-field message-field">
+                          <label htmlFor={`mensagem-${secao.id}`}>
+                            Mensagem
+                          </label>
+                          <textarea
+                            id={`mensagem-${secao.id}`}
+                            name="mensagem"
+                            rows="6"
+                            placeholder="Mensagem"
                             required
                           />
                         </div>
-                      </div>
 
-                      <div className="form-field email-field">
-                        <label htmlFor={`email-${secao.id}`}>Email</label>
-                        <div className="input-with-icon">
-                          <span className="input-icon">✉️</span>
-                          <input
-                            id={`email-${secao.id}`}
-                            name="email"
-                            type="email"
-                            placeholder="Email"
-                            required
+                        <div
+                          className="form-actions"
+                          style={{ marginTop: 10 }}
+                        >
+                          <button type="submit" className="btn-save">
+                            Enviar Mensagem
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
+
+                  {selectedFormType === "erpi" && (
+                    <>
+                      <h3>{selectedFormLabel || "Formulário ERPI"}</h3>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
+                          const data = {
+                            nome_completo: form.nome_completo.value,
+                            data_nascimento: form.data_nascimento.value,
+                            morada_completa: form.morada_completa.value,
+                            codigo_postal: form.codigo_postal.value,
+                            concelho: form.concelho.value,
+                            distrito: form.distrito.value,
+                            cc_bi_numero: form.cc_bi_numero.value,
+                            nif: form.nif.value,
+                            niss: form.niss.value,
+                            numero_utente: form.numero_utente.value,
+                            contacto_nome_completo: form.contacto_nome_completo.value,
+                            contacto_telefone: form.contacto_telefone.value,
+                            contacto_email: form.contacto_email.value,
+                            contacto_parentesco: form.contacto_parentesco.value,
+                            observacoes: form.observacoes.value,
+                            origem_submissao: "site-secao-personalizada",
+                            secao_personalizada_id: secao.id,
+                            formulario_escolhido:
+                              selectedFormLabel || selectedFormType,
+                          };
+
+                          if (
+                            !data.nome_completo ||
+                            !data.data_nascimento ||
+                            !data.morada_completa ||
+                            !data.codigo_postal ||
+                            !data.concelho ||
+                            !data.distrito ||
+                            !data.cc_bi_numero ||
+                            !data.nif ||
+                            !data.niss ||
+                            !data.numero_utente ||
+                            !data.contacto_nome_completo ||
+                            !data.contacto_telefone ||
+                            !data.contacto_email ||
+                            !data.contacto_parentesco
+                          ) {
+                            alert("Preencha todos os campos obrigatórios.");
+                            return;
+                          }
+
+                          try {
+                            const resp = await api.post("/forms/erpi", data);
+                            if (resp.data?.success) {
+                              alert(
+                                "Inscrição ERPI enviada. Entraremos em contacto."
+                              );
+                              form.reset();
+                            } else {
+                              alert("Erro ao enviar inscrição.");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Erro ao enviar inscrição.");
+                          }
+                        }}
+                      >
+                        <div className="form-row">
+                          <div className="form-field name-field">
+                            <label htmlFor={`nome_completo-${secao.id}`}>
+                              Nome completo
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👤</span>
+                              <input
+                                id={`nome_completo-${secao.id}`}
+                                name="nome_completo"
+                                placeholder="Nome completo"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`data_nascimento-${secao.id}`}>
+                              Data de nascimento
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📅</span>
+                              <input
+                                id={`data_nascimento-${secao.id}`}
+                                name="data_nascimento"
+                                type="date"
+                                min={DATE_MIN}
+                                max={DATE_MAX}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`morada_completa-${secao.id}`}>
+                              Morada completa
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏠</span>
+                              <input
+                                id={`morada_completa-${secao.id}`}
+                                name="morada_completa"
+                                placeholder="Rua, nº, andar"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`codigo_postal-${secao.id}`}>
+                              Código Postal
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏷️</span>
+                              <input
+                                id={`codigo_postal-${secao.id}`}
+                                name="codigo_postal"
+                                placeholder="0000-000"
+                                pattern={POSTAL_PATTERN}
+                                title={POSTAL_TITLE}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`concelho-${secao.id}`}>
+                              Concelho
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏘️</span>
+                              <input
+                                id={`concelho-${secao.id}`}
+                                name="concelho"
+                                placeholder="Concelho"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`distrito-${secao.id}`}>
+                              Distrito
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🗺️</span>
+                              <input
+                                id={`distrito-${secao.id}`}
+                                name="distrito"
+                                placeholder="Distrito"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`cc_bi_numero-${secao.id}`}>
+                              CC/BI Nº
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🪪</span>
+                              <input
+                                id={`cc_bi_numero-${secao.id}`}
+                                name="cc_bi_numero"
+                                placeholder="Número do CC/BI"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`nif-${secao.id}`}>
+                              NIF
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input
+                                id={`nif-${secao.id}`}
+                                name="nif"
+                                placeholder="NIF"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`niss-${secao.id}`}>
+                              NISS
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input
+                                id={`niss-${secao.id}`}
+                                name="niss"
+                                placeholder="NISS"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`numero_utente-${secao.id}`}>
+                              Nº Utente de Saúde
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">💳</span>
+                              <input
+                                id={`numero_utente-${secao.id}`}
+                                name="numero_utente"
+                                placeholder="Número de utente"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`contacto_nome_completo-${secao.id}`}>
+                              Nome do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👥</span>
+                              <input
+                                id={`contacto_nome_completo-${secao.id}`}
+                                name="contacto_nome_completo"
+                                placeholder="Quem podemos contactar?"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`contacto_telefone-${secao.id}`}>
+                              Telefone do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">☎️</span>
+                              <input
+                                id={`contacto_telefone-${secao.id}`}
+                                name="contacto_telefone"
+                                placeholder="Telefone"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`contacto_email-${secao.id}`}>
+                              Email do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">✉️</span>
+                              <input
+                                id={`contacto_email-${secao.id}`}
+                                name="contacto_email"
+                                type="email"
+                                placeholder="email@exemplo.pt"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`contacto_parentesco-${secao.id}`}>
+                              Grau de parentesco
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🤝</span>
+                              <input
+                                id={`contacto_parentesco-${secao.id}`}
+                                name="contacto_parentesco"
+                                placeholder="Filho, filha, irmão, etc."
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-field">
+                          <label htmlFor={`observacoes-${secao.id}`}>
+                            Observações / necessidades específicas
+                          </label>
+                          <textarea
+                            id={`observacoes-${secao.id}`}
+                            name="observacoes"
+                            rows="4"
+                            placeholder="Medicações, alergias, mobilidade, etc."
                           />
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="form-field subject-field">
-                      <label htmlFor={`assunto-${secao.id}`}>Assunto</label>
-                      <div className="input-with-icon">
-                        <span className="input-icon">📝</span>
-                        <input
-                          id={`assunto-${secao.id}`}
-                          name="assunto"
-                          placeholder="Assunto"
-                          required
-                        />
-                      </div>
-                    </div>
+                        <div
+                          className="form-actions"
+                          style={{ marginTop: 10 }}
+                        >
+                          <button type="submit" className="btn-save">
+                            Enviar inscrição ERPI
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
 
-                    <div className="form-field message-field">
-                      <label htmlFor={`mensagem-${secao.id}`}>Mensagem</label>
-                      <textarea
-                        id={`mensagem-${secao.id}`}
-                        name="mensagem"
-                        rows="6"
-                        placeholder="Mensagem"
-                        required
-                      />
-                    </div>
+                  {selectedFormType === "creche" && (
+                    <>
+                      <h3>{selectedFormLabel || "Formulário Creche"}</h3>
+                      <form
+                        className="contact-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
 
-                    <div className="form-actions" style={{ marginTop: 10 }}>
-                      <button type="submit" className="btn-save">
-                        Enviar Mensagem
-                      </button>
-                    </div>
-                  </form>
+                          const selectedCrecheInput = form.querySelector(
+                            'input[name="creche_item_id"]:checked'
+                          );
+                          const creche_item_id_value =
+                            selectedCrecheInput?.value &&
+                            selectedCrecheInput.value !== "ambas"
+                              ? selectedCrecheInput.value
+                              : "";
+                          const creche_opcao_label =
+                            selectedCrecheInput?.dataset.label ||
+                            selectedCrecheInput?.value ||
+                            "";
+
+                          const crianca_nasceu = form.crianca_nasceu.value === "sim";
+
+                          const data = {
+                            creche_opcao: creche_opcao_label,
+                            creche_item_id: creche_item_id_value,
+                            nome_completo: form.nome_completo.value,
+                            morada: form.morada.value,
+                            codigo_postal: form.codigo_postal.value,
+                            localidade: form.localidade.value,
+                            crianca_nasceu,
+                            data_nascimento: crianca_nasceu
+                              ? form.data_nascimento.value
+                              : "",
+                            data_prevista: !crianca_nasceu
+                              ? form.data_prevista.value
+                              : "",
+                            cc_bi_numero: form.cc_bi_numero.value,
+                            nif: form.nif.value,
+                            niss: form.niss.value,
+                            numero_utente: form.numero_utente.value,
+                            mae_nome: form.mae_nome.value,
+                            mae_profissao: form.mae_profissao.value,
+                            mae_local_emprego: form.mae_local_emprego.value,
+                            mae_morada: form.mae_morada.value,
+                            mae_codigo_postal: form.mae_codigo_postal.value,
+                            mae_localidade: form.mae_localidade.value,
+                            mae_telemovel: form.mae_telemovel.value,
+                            mae_email: form.mae_email.value,
+                            pai_nome: form.pai_nome.value,
+                            pai_profissao: form.pai_profissao.value,
+                            pai_local_emprego: form.pai_local_emprego.value,
+                            pai_morada: form.pai_morada.value,
+                            pai_codigo_postal: form.pai_codigo_postal.value,
+                            pai_localidade: form.pai_localidade.value,
+                            pai_telemovel: form.pai_telemovel.value,
+                            pai_email: form.pai_email.value,
+                            irmaos_frequentam:
+                              form.irmaos_frequentam.value === "sim",
+                            necessita_apoio:
+                              form.necessita_apoio.value === "sim",
+                            apoio_especificacao: form.apoio_especificacao.value,
+                            origem_submissao: "site-secao-personalizada",
+                            secao_personalizada_id: secao.id,
+                            formulario_escolhido:
+                              selectedFormLabel || selectedFormType,
+                          };
+
+                          if (!data.nome_completo || !data.morada || !data.codigo_postal || !data.localidade) {
+                            alert("Preencha os campos obrigatórios.");
+                            return;
+                          }
+
+                          if (crianca_nasceu && !data.data_nascimento) {
+                            alert("Indique a data de nascimento.");
+                            return;
+                          }
+                          if (!crianca_nasceu && !data.data_prevista) {
+                            alert("Indique a data prevista.");
+                            return;
+                          }
+
+                          try {
+                            const resp = await api.post("/forms/creche", data);
+                            if (resp.data?.success) {
+                              alert("Inscrição Creche enviada. Entraremos em contacto.");
+                              form.reset();
+                            } else {
+                              alert("Erro ao enviar inscrição.");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Erro ao enviar inscrição.");
+                          }
+                        }}
+                      >
+                        <div className="form-field">
+                          <label>Escolha a creche</label>
+                          <div className="form-selector-options" style={{ marginTop: 4 }}>
+                            {crecheOptionsWithAmbas.map((opt, idx) => (
+                              <label
+                                key={opt.id || opt.label}
+                                className={`form-option-card ${
+                                  selectedCreche === opt.id ? "selected" : ""
+                                }`}
+                                style={{ marginBottom: 0 }}
+                              >
+                                <input
+                                  type="radio"
+                                  name="creche_item_id"
+                                  value={opt.id}
+                                  data-label={opt.label}
+                                  checked={selectedCreche === opt.id}
+                                  required
+                                  onChange={() =>
+                                    setCrecheSelecao((prev) => ({
+                                      ...prev,
+                                      [secao.id]: opt.id,
+                                    }))
+                                  }
+                                />
+                                {opt.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="form-field">
+                          <label>Nome completo da criança *</label>
+                          <div className="input-with-icon">
+                            <span className="input-icon">👶</span>
+                            <input
+                              name="nome_completo"
+                              required
+                              placeholder="Nome completo"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Morada *</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏠</span>
+                              <input
+                                name="morada"
+                                required
+                                placeholder="Rua, nº, andar"
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Código Postal *</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏷️</span>
+                              <input
+                                name="codigo_postal"
+                                required
+                                placeholder="0000-000"
+                                pattern={POSTAL_PATTERN}
+                                title={POSTAL_TITLE}
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Localidade *</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏘️</span>
+                              <input
+                                name="localidade"
+                                required
+                                placeholder="Localidade"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>A criança já nasceu? *</label>
+                            <div className="radio-group">
+                              <label>
+                                <input
+                                  type="radio"
+                                  name="crianca_nasceu"
+                                  value="sim"
+                                  onChange={() => {
+                                    setCrecheNasceuState((prev) => ({ ...prev, [secao.id]: true }));
+                                  }}
+                                  required
+                                />
+                                Sim
+                              </label>
+                              <label>
+                                <input
+                                  type="radio"
+                                  name="crianca_nasceu"
+                                  value="nao"
+                                  onChange={() => {
+                                    setCrecheNasceuState((prev) => ({ ...prev, [secao.id]: false }));
+                                  }}
+                                  required
+                                />
+                                Não
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {crecheNasceuState[secao.id] === true && (
+                          <div className="form-field">
+                            <label>Data de nascimento *</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📅</span>
+                              <input
+                                type="date"
+                                name="data_nascimento"
+                                min={DATE_MIN}
+                                max={DATE_MAX}
+                                required
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {crecheNasceuState[secao.id] === false && (
+                          <div className="form-field">
+                            <label>Data prevista *</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📅</span>
+                              <input
+                                type="date"
+                                name="data_prevista"
+                                min={DATE_MIN}
+                                max={DATE_FUTURE_MAX}
+                                required
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>CC/BI</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🪪</span>
+                              <input name="cc_bi_numero" placeholder="Número CC/BI" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>NIF</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input name="nif" placeholder="NIF" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>NISS</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input name="niss" placeholder="NISS" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Nº Utente</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">💳</span>
+                              <input name="numero_utente" placeholder="Número de utente" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <h4>Filiação</h4>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Nome da Mãe</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👩</span>
+                              <input name="mae_nome" placeholder="Nome da mãe" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Profissão</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🧑‍💼</span>
+                              <input name="mae_profissao" placeholder="Profissão" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Local de emprego</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏢</span>
+                              <input name="mae_local_emprego" placeholder="Local de emprego" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Morada</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏠</span>
+                              <input name="mae_morada" placeholder="Morada" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Código Postal</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏷️</span>
+                              <input
+                                name="mae_codigo_postal"
+                                placeholder="0000-000"
+                                pattern={POSTAL_PATTERN}
+                                title={POSTAL_TITLE}
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Localidade</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏘️</span>
+                              <input name="mae_localidade" placeholder="Localidade" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Telemóvel</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📱</span>
+                              <input name="mae_telemovel" placeholder="Telemóvel" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Email</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">✉️</span>
+                              <input
+                                name="mae_email"
+                                type="email"
+                                placeholder="email@exemplo.pt"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Nome do Pai</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👨</span>
+                              <input name="pai_nome" placeholder="Nome do pai" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Profissão do pai</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🧑‍💼</span>
+                              <input name="pai_profissao" placeholder="Profissão" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Local de emprego do pai</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏢</span>
+                              <input name="pai_local_emprego" placeholder="Local de emprego" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Morada do pai</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏠</span>
+                              <input name="pai_morada" placeholder="Morada" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Código Postal</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏷️</span>
+                              <input
+                                name="pai_codigo_postal"
+                                placeholder="0000-000"
+                                pattern={POSTAL_PATTERN}
+                                title={POSTAL_TITLE}
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Localidade</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏘️</span>
+                              <input name="pai_localidade" placeholder="Localidade" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Telemóvel</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📱</span>
+                              <input name="pai_telemovel" placeholder="Telemóvel" />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label>Email</label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">✉️</span>
+                              <input
+                                name="pai_email"
+                                type="email"
+                                placeholder="email@exemplo.pt"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>Irmãos a frequentar o estabelecimento?</label>
+                            <div className="radio-group">
+                              <label>
+                                <input type="radio" name="irmaos_frequentam" value="sim" /> Sim
+                              </label>
+                              <label>
+                                <input type="radio" name="irmaos_frequentam" value="nao" defaultChecked /> Não
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label>A criança necessita de apoio especial?</label>
+                            <div className="radio-group">
+                              <label>
+                                <input
+                                  type="radio"
+                                  name="necessita_apoio"
+                                  value="sim"
+                                  onChange={() => {
+                                    const wrap = document.getElementById(`apoio-wrap-${secao.id}`);
+                                    if (wrap) wrap.style.display = "block";
+                                  }}
+                                />
+                                Sim
+                              </label>
+                              <label>
+                                <input
+                                  type="radio"
+                                  name="necessita_apoio"
+                                  value="nao"
+                                  defaultChecked
+                                  onChange={() => {
+                                    const wrap = document.getElementById(`apoio-wrap-${secao.id}`);
+                                    if (wrap) wrap.style.display = "none";
+                                  }}
+                                />
+                                Não
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          id={`apoio-wrap-${secao.id}`}
+                          style={{ display: "none" }}
+                          className="form-field"
+                        >
+                          <label>Se sim, especifique</label>
+                          <textarea name="apoio_especificacao" rows="3" placeholder="Descreva o apoio necessário" />
+                        </div>
+
+                        <div
+                          className="form-actions"
+                          style={{ marginTop: 10 }}
+                        >
+                          <button type="submit" className="btn-save">
+                            Enviar inscrição Creche
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
+
+                  {selectedFormType === "centro_de_dia" && (
+                    <>
+                      <h3>{selectedFormLabel || "Formulário Centro de Dia"}</h3>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
+                          const data = {
+                            nome_completo: form.nome_completo.value,
+                            data_nascimento: form.data_nascimento.value,
+                            morada_completa: form.morada_completa.value,
+                            codigo_postal: form.codigo_postal.value,
+                            concelho: form.concelho.value,
+                            distrito: form.distrito.value,
+                            cc_bi_numero: form.cc_bi_numero.value,
+                            nif: form.nif.value,
+                            niss: form.niss.value,
+                            numero_utente: form.numero_utente.value,
+                            contacto_nome_completo: form.contacto_nome_completo.value,
+                            contacto_telefone: form.contacto_telefone.value,
+                            contacto_email: form.contacto_email.value,
+                            contacto_parentesco: form.contacto_parentesco.value,
+                            observacoes: form.observacoes.value,
+                            origem_submissao: "site-secao-personalizada",
+                            secao_personalizada_id: secao.id,
+                            formulario_escolhido:
+                              selectedFormLabel || selectedFormType,
+                          };
+
+                          if (
+                            !data.nome_completo ||
+                            !data.data_nascimento ||
+                            !data.morada_completa ||
+                            !data.codigo_postal ||
+                            !data.concelho ||
+                            !data.distrito ||
+                            !data.cc_bi_numero ||
+                            !data.nif ||
+                            !data.niss ||
+                            !data.numero_utente ||
+                            !data.contacto_nome_completo ||
+                            !data.contacto_telefone ||
+                            !data.contacto_email ||
+                            !data.contacto_parentesco
+                          ) {
+                            alert("Preencha todos os campos obrigatórios.");
+                            return;
+                          }
+
+                              setCrecheSelecao((prev) => ({
+                                ...prev,
+                                [secao.id]: crecheOptionsWithAmbas[0]?.id || "ambas",
+                              }));
+                              setCrecheNasceuState((prev) => ({
+                                ...prev,
+                                [secao.id]: undefined,
+                              }));
+                          try {
+                            const resp = await api.post(
+                              "/forms/centro-de-dia",
+                              data
+                            );
+                            if (resp.data?.success) {
+                              alert(
+                                "Inscrição Centro de Dia enviada. Entraremos em contacto."
+                              );
+                              form.reset();
+                            } else {
+                              alert("Erro ao enviar inscrição.");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Erro ao enviar inscrição.");
+                          }
+                        }}
+                      >
+                        <div className="form-row">
+                          <div className="form-field name-field">
+                            <label htmlFor={`nome_completo-${secao.id}`}>
+                              Nome completo
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👤</span>
+                              <input
+                                id={`nome_completo-${secao.id}`}
+                                name="nome_completo"
+                                placeholder="Nome completo"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`data_nascimento-${secao.id}`}>
+                              Data de nascimento
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📅</span>
+                              <input
+                                id={`data_nascimento-${secao.id}`}
+                                name="data_nascimento"
+                                type="date"
+                                min={DATE_MIN}
+                                max={DATE_MAX}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`morada_completa-${secao.id}`}>
+                              Morada completa
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏠</span>
+                              <input
+                                id={`morada_completa-${secao.id}`}
+                                name="morada_completa"
+                                placeholder="Rua, nº, andar"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`codigo_postal-${secao.id}`}>
+                              Código Postal
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏷️</span>
+                              <input
+                                id={`codigo_postal-${secao.id}`}
+                                name="codigo_postal"
+                                placeholder="0000-000"
+                                pattern={POSTAL_PATTERN}
+                                title={POSTAL_TITLE}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`concelho-${secao.id}`}>
+                              Concelho
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏘️</span>
+                              <input
+                                id={`concelho-${secao.id}`}
+                                name="concelho"
+                                placeholder="Concelho"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`distrito-${secao.id}`}>
+                              Distrito
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🗺️</span>
+                              <input
+                                id={`distrito-${secao.id}`}
+                                name="distrito"
+                                placeholder="Distrito"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`cc_bi_numero-${secao.id}`}>
+                              CC/BI Nº
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🪪</span>
+                              <input
+                                id={`cc_bi_numero-${secao.id}`}
+                                name="cc_bi_numero"
+                                placeholder="Número do CC/BI"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`nif-${secao.id}`}>
+                              NIF
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input
+                                id={`nif-${secao.id}`}
+                                name="nif"
+                                placeholder="NIF"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`niss-${secao.id}`}>
+                              NISS
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input
+                                id={`niss-${secao.id}`}
+                                name="niss"
+                                placeholder="NISS"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`numero_utente-${secao.id}`}>
+                              Nº Utente de Saúde
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">💳</span>
+                              <input
+                                id={`numero_utente-${secao.id}`}
+                                name="numero_utente"
+                                placeholder="Número de utente"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`contacto_nome_completo-${secao.id}`}>
+                              Nome do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👥</span>
+                              <input
+                                id={`contacto_nome_completo-${secao.id}`}
+                                name="contacto_nome_completo"
+                                placeholder="Quem podemos contactar?"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`contacto_telefone-${secao.id}`}>
+                              Telefone do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">☎️</span>
+                              <input
+                                id={`contacto_telefone-${secao.id}`}
+                                name="contacto_telefone"
+                                placeholder="Telefone"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`contacto_email-${secao.id}`}>
+                              Email do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">✉️</span>
+                              <input
+                                id={`contacto_email-${secao.id}`}
+                                name="contacto_email"
+                                type="email"
+                                placeholder="email@exemplo.pt"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`contacto_parentesco-${secao.id}`}>
+                              Grau de parentesco
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🤝</span>
+                              <input
+                                id={`contacto_parentesco-${secao.id}`}
+                                name="contacto_parentesco"
+                                placeholder="Filho, filha, irmão, etc."
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-field">
+                          <label htmlFor={`observacoes-${secao.id}`}>
+                            Observações / necessidades específicas
+                          </label>
+                          <textarea
+                            id={`observacoes-${secao.id}`}
+                            name="observacoes"
+                            rows="4"
+                            placeholder="Medicações, alergias, mobilidade, etc."
+                          />
+                        </div>
+
+                        <div
+                          className="form-actions"
+                          style={{ marginTop: 10 }}
+                        >
+                          <button type="submit" className="btn-save">
+                            Enviar inscrição Centro de Dia
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
+
+                  {selectedFormType === "sad" && (
+                    <>
+                      <h3>{selectedFormLabel || "Formulário SAD"}</h3>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const form = e.currentTarget;
+
+                          const data = {
+                            nome_completo: form.nome_completo.value,
+                            data_nascimento: form.data_nascimento.value,
+                            morada_completa: form.morada_completa.value,
+                            codigo_postal: form.codigo_postal.value,
+                            concelho: form.concelho.value,
+                            distrito: form.distrito.value,
+                            cc_bi_numero: form.cc_bi_numero.value,
+                            nif: form.nif.value,
+                            niss: form.niss.value,
+                            numero_utente: form.numero_utente.value,
+                            contacto_nome_completo: form.contacto_nome_completo.value,
+                            contacto_telefone: form.contacto_telefone.value,
+                            contacto_email: form.contacto_email.value,
+                            contacto_parentesco: form.contacto_parentesco.value,
+                            observacoes: form.observacoes.value,
+                            higiene_pessoal: form.higiene_pessoal.checked,
+                            higiene_habitacional: form.higiene_habitacional.checked,
+                            refeicoes: form.refeicoes.checked,
+                            tratamento_roupa: form.tratamento_roupa.checked,
+                            periodicidade_higiene_pessoal:
+                              form.higiene_pessoal.checked
+                                ? form.periodicidade_higiene_pessoal.value
+                                : "",
+                            vezes_higiene_pessoal:
+                              form.higiene_pessoal.checked
+                                ? form.vezes_higiene_pessoal.value
+                                : "",
+                            periodicidade_higiene_habitacional:
+                              form.higiene_habitacional.checked
+                                ? form.periodicidade_higiene_habitacional.value
+                                : "",
+                            vezes_higiene_habitacional:
+                              form.higiene_habitacional.checked
+                                ? form.vezes_higiene_habitacional.value
+                                : "",
+                            periodicidade_refeicoes:
+                              form.refeicoes.checked
+                                ? form.periodicidade_refeicoes.value
+                                : "",
+                            vezes_refeicoes:
+                              form.refeicoes.checked
+                                ? form.vezes_refeicoes.value
+                                : "",
+                            periodicidade_tratamento_roupa:
+                              form.tratamento_roupa.checked
+                                ? form.periodicidade_tratamento_roupa.value
+                                : "",
+                            vezes_tratamento_roupa:
+                              form.tratamento_roupa.checked
+                                ? form.vezes_tratamento_roupa.value
+                                : "",
+                            origem_submissao: "site-secao-personalizada",
+                            secao_personalizada_id: secao.id,
+                            formulario_escolhido:
+                              selectedFormLabel || selectedFormType,
+                          };
+
+                          if (
+                            !data.nome_completo ||
+                            !data.data_nascimento ||
+                            !data.morada_completa ||
+                            !data.codigo_postal ||
+                            !data.concelho ||
+                            !data.distrito ||
+                            !data.cc_bi_numero ||
+                            !data.nif ||
+                            !data.niss ||
+                            !data.numero_utente ||
+                            !data.contacto_nome_completo ||
+                            !data.contacto_telefone ||
+                            !data.contacto_email ||
+                            !data.contacto_parentesco
+                          ) {
+                            alert("Preencha todos os campos obrigatórios.");
+                            return;
+                          }
+
+                          try {
+                            const resp = await api.post("/forms/sad", data);
+                            if (resp.data?.success) {
+                              alert(
+                                "Inscrição SAD enviada. Entraremos em contacto."
+                              );
+                              form.reset();
+                            } else {
+                              alert("Erro ao enviar inscrição.");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert("Erro ao enviar inscrição.");
+                          }
+                        }}
+                      >
+                        <div className="form-row">
+                          <div className="form-field name-field">
+                            <label htmlFor={`nome_completo-${secao.id}`}>
+                              Nome completo
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👤</span>
+                              <input
+                                id={`nome_completo-${secao.id}`}
+                                name="nome_completo"
+                                placeholder="Nome completo"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`data_nascimento-${secao.id}`}>
+                              Data de nascimento
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📅</span>
+                              <input
+                                id={`data_nascimento-${secao.id}`}
+                                name="data_nascimento"
+                                type="date"
+                                min={DATE_MIN}
+                                max={DATE_MAX}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`morada_completa-${secao.id}`}>
+                              Morada completa
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏠</span>
+                              <input
+                                id={`morada_completa-${secao.id}`}
+                                name="morada_completa"
+                                placeholder="Rua, nº, andar"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`codigo_postal-${secao.id}`}>
+                              Código Postal
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏷️</span>
+                              <input
+                                id={`codigo_postal-${secao.id}`}
+                                name="codigo_postal"
+                                placeholder="0000-000"
+                                pattern={POSTAL_PATTERN}
+                                title={POSTAL_TITLE}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`concelho-${secao.id}`}>
+                              Concelho
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🏘️</span>
+                              <input
+                                id={`concelho-${secao.id}`}
+                                name="concelho"
+                                placeholder="Concelho"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`distrito-${secao.id}`}>
+                              Distrito
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🗺️</span>
+                              <input
+                                id={`distrito-${secao.id}`}
+                                name="distrito"
+                                placeholder="Distrito"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`cc_bi_numero-${secao.id}`}>
+                              CC/BI Nº
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🪪</span>
+                              <input
+                                id={`cc_bi_numero-${secao.id}`}
+                                name="cc_bi_numero"
+                                placeholder="Número do CC/BI"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`nif-${secao.id}`}>
+                              NIF
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input
+                                id={`nif-${secao.id}`}
+                                name="nif"
+                                placeholder="NIF"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`niss-${secao.id}`}>
+                              NISS
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">#</span>
+                              <input
+                                id={`niss-${secao.id}`}
+                                name="niss"
+                                placeholder="NISS"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`numero_utente-${secao.id}`}>
+                              Nº Utente de Saúde
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">💳</span>
+                              <input
+                                id={`numero_utente-${secao.id}`}
+                                name="numero_utente"
+                                placeholder="Número de utente"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`contacto_nome_completo-${secao.id}`}>
+                              Nome do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">👥</span>
+                              <input
+                                id={`contacto_nome_completo-${secao.id}`}
+                                name="contacto_nome_completo"
+                                placeholder="Quem podemos contactar?"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`contacto_telefone-${secao.id}`}>
+                              Telefone do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">☎️</span>
+                              <input
+                                id={`contacto_telefone-${secao.id}`}
+                                name="contacto_telefone"
+                                placeholder="Telefone"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field">
+                            <label htmlFor={`contacto_email-${secao.id}`}>
+                              Email do contacto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">✉️</span>
+                              <input
+                                id={`contacto_email-${secao.id}`}
+                                name="contacto_email"
+                                type="email"
+                                placeholder="email@exemplo.pt"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="form-field">
+                            <label htmlFor={`contacto_parentesco-${secao.id}`}>
+                              Grau de parentesco
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">🤝</span>
+                              <input
+                                id={`contacto_parentesco-${secao.id}`}
+                                name="contacto_parentesco"
+                                placeholder="Filho, filha, irmão, etc."
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="form-field">
+                          <label htmlFor={`observacoes-${secao.id}`}>
+                            Observações / necessidades específicas
+                          </label>
+                          <textarea
+                            id={`observacoes-${secao.id}`}
+                            name="observacoes"
+                            rows="4"
+                            placeholder="Medicações, alergias, mobilidade, etc."
+                          />
+                        </div>
+
+                        {/* Serviços marcáveis */}
+                        <div className="form-row">
+                          <div className="form-field checkbox-field">
+                            <label>
+                              <input
+                                type="checkbox"
+                                name="higiene_pessoal"
+                                id={`higiene_pessoal-${secao.id}`}
+                                onChange={(e) => {
+                                  const wrap = document.getElementById(
+                                    `wrap-higiene_pessoal-${secao.id}`
+                                  );
+                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                }}
+                              />
+                              Higiene pessoal
+                            </label>
+                          </div>
+                          <div className="form-field checkbox-field">
+                            <label>
+                              <input
+                                type="checkbox"
+                                name="higiene_habitacional"
+                                id={`higiene_habitacional-${secao.id}`}
+                                onChange={(e) => {
+                                  const wrap = document.getElementById(
+                                    `wrap-higiene_habitacional-${secao.id}`
+                                  );
+                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                }}
+                              />
+                              Higiene habitacional
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-field checkbox-field">
+                            <label>
+                              <input
+                                type="checkbox"
+                                name="refeicoes"
+                                id={`refeicoes-${secao.id}`}
+                                onChange={(e) => {
+                                  const wrap = document.getElementById(
+                                    `wrap-refeicoes-${secao.id}`
+                                  );
+                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                }}
+                              />
+                              Refeições
+                            </label>
+                          </div>
+                          <div className="form-field checkbox-field">
+                            <label>
+                              <input
+                                type="checkbox"
+                                name="tratamento_roupa"
+                                id={`tratamento_roupa-${secao.id}`}
+                                onChange={(e) => {
+                                  const wrap = document.getElementById(
+                                    `wrap-tratamento_roupa-${secao.id}`
+                                  );
+                                  if (wrap) wrap.style.display = e.target.checked ? "block" : "none";
+                                }}
+                              />
+                              Tratamento de roupa
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Configurações por serviço */}
+                        <div
+                          id={`wrap-higiene_pessoal-${secao.id}`}
+                          style={{ display: "none" }}
+                          className="service-config"
+                        >
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`periodicidade_higiene_pessoal-${secao.id}`}>
+                                Periodicidade (Higiene pessoal)
+                              </label>
+                              <select
+                                id={`periodicidade_higiene_pessoal-${secao.id}`}
+                                name="periodicidade_higiene_pessoal"
+                                defaultValue=""
+                              >
+                                <option value="">Selecione</option>
+                                <option value="segunda a sexta">Segunda a sexta</option>
+                                <option value="segunda a sabado">Segunda a sábado</option>
+                                <option value="segunda a domingo">Segunda a domingo</option>
+                              </select>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`vezes_higiene_pessoal-${secao.id}`}>
+                                Vezes por dia (Higiene pessoal)
+                              </label>
+                              <input
+                                id={`vezes_higiene_pessoal-${secao.id}`}
+                                name="vezes_higiene_pessoal"
+                                type="number"
+                                min="1"
+                                max="5"
+                                placeholder="1-5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          id={`wrap-higiene_habitacional-${secao.id}`}
+                          style={{ display: "none" }}
+                          className="service-config"
+                        >
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`periodicidade_higiene_habitacional-${secao.id}`}>
+                                Periodicidade (Higiene habitacional)
+                              </label>
+                              <select
+                                id={`periodicidade_higiene_habitacional-${secao.id}`}
+                                name="periodicidade_higiene_habitacional"
+                                defaultValue=""
+                              >
+                                <option value="">Selecione</option>
+                                <option value="segunda a sexta">Segunda a sexta</option>
+                                <option value="segunda a sabado">Segunda a sábado</option>
+                                <option value="segunda a domingo">Segunda a domingo</option>
+                              </select>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`vezes_higiene_habitacional-${secao.id}`}>
+                                Vezes por dia (Higiene habitacional)
+                              </label>
+                              <input
+                                id={`vezes_higiene_habitacional-${secao.id}`}
+                                name="vezes_higiene_habitacional"
+                                type="number"
+                                min="1"
+                                max="5"
+                                placeholder="1-5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          id={`wrap-refeicoes-${secao.id}`}
+                          style={{ display: "none" }}
+                          className="service-config"
+                        >
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`periodicidade_refeicoes-${secao.id}`}>
+                                Periodicidade (Refeições)
+                              </label>
+                              <select
+                                id={`periodicidade_refeicoes-${secao.id}`}
+                                name="periodicidade_refeicoes"
+                                defaultValue=""
+                              >
+                                <option value="">Selecione</option>
+                                <option value="segunda a sexta">Segunda a sexta</option>
+                                <option value="segunda a sabado">Segunda a sábado</option>
+                                <option value="segunda a domingo">Segunda a domingo</option>
+                              </select>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`vezes_refeicoes-${secao.id}`}>
+                                Vezes por dia (Refeições)
+                              </label>
+                              <input
+                                id={`vezes_refeicoes-${secao.id}`}
+                                name="vezes_refeicoes"
+                                type="number"
+                                min="1"
+                                max="5"
+                                placeholder="1-5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          id={`wrap-tratamento_roupa-${secao.id}`}
+                          style={{ display: "none" }}
+                          className="service-config"
+                        >
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`periodicidade_tratamento_roupa-${secao.id}`}>
+                                Periodicidade (Tratamento de roupa)
+                              </label>
+                              <select
+                                id={`periodicidade_tratamento_roupa-${secao.id}`}
+                                name="periodicidade_tratamento_roupa"
+                                defaultValue=""
+                              >
+                                <option value="">Selecione</option>
+                                <option value="segunda a sexta">Segunda a sexta</option>
+                                <option value="segunda a sabado">Segunda a sábado</option>
+                                <option value="segunda a domingo">Segunda a domingo</option>
+                              </select>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`vezes_tratamento_roupa-${secao.id}`}>
+                                Vezes por dia (Tratamento de roupa)
+                              </label>
+                              <input
+                                id={`vezes_tratamento_roupa-${secao.id}`}
+                                name="vezes_tratamento_roupa"
+                                type="number"
+                                min="1"
+                                max="5"
+                                placeholder="1-5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          className="form-actions"
+                          style={{ marginTop: 10 }}
+                        >
+                          <button type="submit" className="btn-save">
+                            Enviar inscrição SAD
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
                 </div>
               )}
             </div>
