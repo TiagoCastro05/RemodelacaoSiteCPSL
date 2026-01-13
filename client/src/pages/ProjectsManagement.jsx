@@ -174,10 +174,6 @@ const ProjectsManagement = () => {
 
   return (
     <div className="projects-management">
-      <button className="btn-back" onClick={() => navigate("/dashboard")}>
-        ← Voltar
-      </button>
-
       <div className="section-header">
         <div>
           <h2>Projetos ({filteredProjects.length})</h2>
@@ -185,9 +181,14 @@ const ProjectsManagement = () => {
             Gerencie os projetos que aparecem na seção "Projetos" do site
           </p>
         </div>
-        <button className="btn-primary" onClick={handleNewProject}>
-          + Novo Projeto
-        </button>
+        <div className="dashboard-actions">
+          <button className="btn-back" onClick={() => navigate("/dashboard")}>
+            ← Voltar
+          </button>
+          <button className="btn-primary" onClick={handleNewProject}>
+            + Novo Projeto
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

@@ -156,15 +156,16 @@ const Users = () => {
 
   return (
     <div className="users-page">
-      <button className="btn-back" onClick={() => navigate("/dashboard")}>
-        ← Voltar
-      </button>
-
       <div className="users-header">
         <h2>Gestão de Utilizadores ({filteredUsers.length})</h2>
-        <button className="btn-primary" onClick={() => setShowModal(true)}>
-          + Novo Utilizador
-        </button>
+        <div className="dashboard-actions">
+          <button className="btn-back" onClick={() => navigate("/dashboard")}>
+            ← Voltar
+          </button>
+          <button className="btn-primary" onClick={() => setShowModal(true)}>
+            + Novo Utilizador
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

@@ -176,10 +176,6 @@ const Inscriptions = () => {
 
   return (
     <div className="inscriptions-page">
-      <button className="btn-back" onClick={() => navigate("/dashboard")}>
-        ← Voltar
-      </button>
-
       <div className="inscriptions-header">
         <h2>
           Inscrições {FORM_LABELS[selectedType]} ({filteredItems.length})
@@ -188,6 +184,9 @@ const Inscriptions = () => {
           )}
         </h2>
         <div className="inscriptions-actions">
+          <button className="btn-back" onClick={() => navigate("/dashboard")}>
+            ← Voltar
+          </button>
           <button
             onClick={() => fetchItems(selectedType)}
             className="btn-refresh"

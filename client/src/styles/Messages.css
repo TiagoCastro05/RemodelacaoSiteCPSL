@@ -7,6 +7,12 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  gap: 1rem;
+}
+
+.messages-header h2 {
+  margin: 0;
+  flex: 1;
 }
 
 /* Barra de Filtros */
@@ -121,11 +127,12 @@
 }
 .btn-refresh {
   background: var(--primary-color);
-  color: #fff;
+  color: #000;
   border: none;
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
+  font-weight: 500;
 }
 .btn-refresh:hover {
   background: var(--primary-hover);

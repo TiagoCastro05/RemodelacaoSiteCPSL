@@ -12,6 +12,10 @@
   border-bottom: 2px solid #f0f0f0;
 }
 
+.section-header > div:first-child {
+  flex: 1;
+}
+
 .section-header h2 {
   margin: 0 0 0.5rem 0;
   color: #2c3e50;

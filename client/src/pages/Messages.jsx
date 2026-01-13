@@ -160,18 +160,19 @@ const Messages = () => {
 
   return (
     <div className="messages-page">
-      <button className="btn-back" onClick={() => navigate("/dashboard")}>
-        ← Voltar
-      </button>
-
       <div className="messages-header">
         <h2>
           Mensagens ({filteredMensagens.length})
           {unreadCount > 0 && ` - ${unreadCount} novas`}
         </h2>
-        <button onClick={fetchMensagens} className="btn-refresh">
-          🔄 Atualizar
-        </button>
+        <div className="dashboard-actions">
+          <button className="btn-back" onClick={() => navigate("/dashboard")}>
+            ← Voltar
+          </button>
+          <button onClick={fetchMensagens} className="btn-refresh">
+            🔄 Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
