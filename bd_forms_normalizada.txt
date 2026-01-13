@@ -1,0 +1,105 @@
+-- Limpeza total das tabelas antigas e do enum, se existirem
+DROP TABLE IF EXISTS detalhes_sad CASCADE;
+DROP TABLE IF EXISTS detalhes_creche CASCADE;
+DROP TABLE IF EXISTS contactos_emergencia CASCADE;
+DROP TABLE IF EXISTS inscricoes CASCADE;
+DROP TABLE IF EXISTS pessoas CASCADE;
+DROP TABLE IF EXISTS forms_sad CASCADE;
+DROP TABLE IF EXISTS forms_creche CASCADE;
+DROP TABLE IF EXISTS forms_erpi CASCADE;
+DROP TABLE IF EXISTS forms_centro_de_dia CASCADE;
+DROP TYPE IF EXISTS tipo_servico CASCADE;
+
+-- Enum de serviço
+CREATE TYPE tipo_servico AS ENUM ('ERPI', 'CENTRO_DIA', 'SAD', 'CRECHE');
+
+-- Estrutura comum
+CREATE TABLE pessoas (
+  id SERIAL PRIMARY KEY,
+  nome_completo TEXT NOT NULL,
+  data_nascimento DATE,
+  cc_bi_numero VARCHAR(50) UNIQUE,
+  nif VARCHAR(50) UNIQUE,
+  niss VARCHAR(50) UNIQUE,
+  numero_utente VARCHAR(50) UNIQUE,
+  morada_completa TEXT NOT NULL,
+  codigo_postal VARCHAR(20) NOT NULL,
+  localidade TEXT NOT NULL,
+  concelho TEXT,
+  distrito TEXT,
+  criado_em TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE contactos_emergencia (
+  id SERIAL PRIMARY KEY,
+  pessoa_id INTEGER REFERENCES pessoas(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  telefone VARCHAR(30) NOT NULL,
+  email TEXT,
+  parentesco TEXT NOT NULL
+);
+
+CREATE TABLE inscricoes (
+  id SERIAL PRIMARY KEY,
+  pessoa_id INTEGER REFERENCES pessoas(id),
+  servico tipo_servico NOT NULL,
+  observacoes TEXT,
+  origem_submissao TEXT,
+  secao_personalizada_id INTEGER,
+  formulario_escolhido TEXT,
+  creche_opcao TEXT,
+  creche_item_id INTEGER,
+  lido BOOLEAN DEFAULT FALSE,
+  lido_em TIMESTAMPTZ,
+  data_inscricao TIMESTAMPTZ DEFAULT now()
+);
+
+-- Detalhes específicos SAD
+CREATE TABLE detalhes_sad (
+  inscricao_id INTEGER PRIMARY KEY REFERENCES inscricoes(id) ON DELETE CASCADE,
+  higiene_pessoal BOOLEAN DEFAULT FALSE,
+  periodicidade_higiene_pessoal VARCHAR(30),
+  vezes_higiene_pessoal INTEGER CHECK (vezes_higiene_pessoal BETWEEN 1 AND 5),
+  higiene_habitacional BOOLEAN DEFAULT FALSE,
+  periodicidade_higiene_habitacional VARCHAR(30),
+  vezes_higiene_habitacional INTEGER CHECK (vezes_higiene_habitacional BETWEEN 1 AND 5),
+  refeicoes BOOLEAN DEFAULT FALSE,
+  periodicidade_refeicoes VARCHAR(30),
+  vezes_refeicoes INTEGER CHECK (vezes_refeicoes BETWEEN 1 AND 5),
+  tratamento_roupa BOOLEAN DEFAULT FALSE,
+  periodicidade_tratamento_roupa VARCHAR(30),
+  vezes_tratamento_roupa INTEGER CHECK (vezes_tratamento_roupa BETWEEN 1 AND 5)
+);
+
+-- Detalhes específicos Creche
+CREATE TABLE detalhes_creche (
+  inscricao_id INTEGER PRIMARY KEY REFERENCES inscricoes(id) ON DELETE CASCADE,
+  crianca_nasceu BOOLEAN NOT NULL,
+  data_prevista DATE,
+  irmaos_frequentam BOOLEAN,
+  necessita_apoio BOOLEAN,
+  apoio_especificacao TEXT,
+  mae_nome TEXT,
+  mae_profissao TEXT,
+  mae_local_emprego TEXT,
+  mae_morada TEXT,
+  mae_codigo_postal VARCHAR(20),
+  mae_localidade TEXT,
+  mae_telemovel VARCHAR(30),
+  mae_email TEXT,
+  pai_nome TEXT,
+  pai_profissao TEXT,
+  pai_local_emprego TEXT,
+  pai_morada TEXT,
+  pai_codigo_postal VARCHAR(20),
+  pai_localidade TEXT,
+  pai_telemovel VARCHAR(30),
+  pai_email TEXT
+);
+
+-- Índices
+CREATE INDEX idx_pessoas_nif ON pessoas(nif);
+CREATE INDEX idx_inscricoes_servico ON inscricoes(servico);
+CREATE INDEX idx_inscricoes_pessoa ON inscricoes(pessoa_id);
+CREATE INDEX idx_inscricoes_lido ON inscricoes(lido, servico);
+CREATE INDEX idx_inscricoes_creche_item ON inscricoes(creche_item_id) WHERE servico = 'CRECHE';

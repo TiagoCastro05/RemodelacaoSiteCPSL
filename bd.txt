@@ -144,3 +144,370 @@ CREATE TABLE forms_creche (
 
 CREATE INDEX idx_forms_creche_nif ON forms_creche (nif);
 CREATE INDEX idx_forms_creche_data ON forms_creche (data_nascimento);
+
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+
+-- Limpeza (executar em janela de manutenção; elimina dados antigos destas tabelas)
+DROP TABLE IF EXISTS forms_sad CASCADE;
+DROP TABLE IF EXISTS forms_creche CASCADE;
+DROP TABLE IF EXISTS forms_erpi CASCADE;
+DROP TABLE IF EXISTS forms_centro_de_dia CASCADE;
+DROP TYPE IF EXISTS tipo_servico CASCADE;
+
+-- Compatibilidade/upgrade de instâncias que já tinham "pessoas" sem as novas colunas
+ALTER TABLE IF EXISTS pessoas ADD COLUMN IF NOT EXISTS localidade TEXT;
+ALTER TABLE IF EXISTS pessoas ADD COLUMN IF NOT EXISTS concelho TEXT;
+ALTER TABLE IF EXISTS pessoas ADD COLUMN IF NOT EXISTS distrito TEXT;
+
+-- Tornar opcionais os docs e data_nascimento para suportar creche/bebés
+ALTER TABLE IF EXISTS pessoas ALTER COLUMN data_nascimento DROP NOT NULL;
+ALTER TABLE IF EXISTS pessoas ALTER COLUMN cc_bi_numero DROP NOT NULL;
+ALTER TABLE IF EXISTS pessoas ALTER COLUMN nif DROP NOT NULL;
+ALTER TABLE IF EXISTS pessoas ALTER COLUMN niss DROP NOT NULL;
+ALTER TABLE IF EXISTS pessoas ALTER COLUMN numero_utente DROP NOT NULL;
+
+-- Preencher localidade a partir de concelho quando estiver em falta
+UPDATE pessoas SET localidade = COALESCE(localidade, concelho) WHERE localidade IS NULL;
+
+-- Estrutura comum
+CREATE TABLE pessoas (
+  id SERIAL PRIMARY KEY,
+  nome_completo TEXT NOT NULL,
+  data_nascimento DATE,
+  cc_bi_numero VARCHAR(50) UNIQUE,
+  nif VARCHAR(50) UNIQUE,
+  niss VARCHAR(50) UNIQUE,
+  numero_utente VARCHAR(50) UNIQUE,
+  morada_completa TEXT NOT NULL,
+  codigo_postal VARCHAR(20) NOT NULL,
+  localidade TEXT NOT NULL,
+  concelho TEXT,
+  distrito TEXT,
+  criado_em TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE contactos_emergencia (
+  id SERIAL PRIMARY KEY,
+  pessoa_id INTEGER REFERENCES pessoas(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  telefone VARCHAR(30) NOT NULL,
+  email TEXT,
+  parentesco TEXT NOT NULL
+);
+
+CREATE TYPE tipo_servico AS ENUM ('ERPI', 'CENTRO_DIA', 'SAD', 'CRECHE');
+
+CREATE TABLE inscricoes (
+  id SERIAL PRIMARY KEY,
+  pessoa_id INTEGER REFERENCES pessoas(id),
+  servico tipo_servico NOT NULL,
+  observacoes TEXT,
+  origem_submissao TEXT,
+  secao_personalizada_id INTEGER,
+  formulario_escolhido TEXT,
+  creche_opcao TEXT,
+  creche_item_id INTEGER,
+  lido BOOLEAN DEFAULT FALSE,
+  lido_em TIMESTAMPTZ,
+  data_inscricao TIMESTAMPTZ DEFAULT now()
+);
+
+-- Detalhes específicos
+CREATE TABLE detalhes_sad (
+  inscricao_id INTEGER PRIMARY KEY REFERENCES inscricoes(id) ON DELETE CASCADE,
+  higiene_pessoal BOOLEAN DEFAULT FALSE,
+  periodicidade_higiene_pessoal VARCHAR(30),
+  vezes_higiene_pessoal INTEGER CHECK (vezes_higiene_pessoal BETWEEN 1 AND 5),
+  higiene_habitacional BOOLEAN DEFAULT FALSE,
+  periodicidade_higiene_habitacional VARCHAR(30),
+  vezes_higiene_habitacional INTEGER CHECK (vezes_higiene_habitacional BETWEEN 1 AND 5),
+  refeicoes BOOLEAN DEFAULT FALSE,
+  periodicidade_refeicoes VARCHAR(30),
+  vezes_refeicoes INTEGER CHECK (vezes_refeicoes BETWEEN 1 AND 5),
+  tratamento_roupa BOOLEAN DEFAULT FALSE,
+  periodicidade_tratamento_roupa VARCHAR(30),
+  vezes_tratamento_roupa INTEGER CHECK (vezes_tratamento_roupa BETWEEN 1 AND 5)
+);
+
+CREATE TABLE detalhes_creche (
+  inscricao_id INTEGER PRIMARY KEY REFERENCES inscricoes(id) ON DELETE CASCADE,
+  crianca_nasceu BOOLEAN NOT NULL,
+  data_prevista DATE,
+  irmaos_frequentam BOOLEAN,
+  necessita_apoio BOOLEAN,
+  apoio_especificacao TEXT,
+  mae_nome TEXT,
+  mae_profissao TEXT,
+  mae_local_emprego TEXT,
+  mae_morada TEXT,
+  mae_codigo_postal VARCHAR(20),
+  mae_localidade TEXT,
+  mae_telemovel VARCHAR(30),
+  mae_email TEXT,
+  pai_nome TEXT,
+  pai_profissao TEXT,
+  pai_local_emprego TEXT,
+  pai_morada TEXT,
+  pai_codigo_postal VARCHAR(20),
+  pai_localidade TEXT,
+  pai_telemovel VARCHAR(30),
+  pai_email TEXT
+);
+
+-- Índices úteis
+CREATE INDEX idx_pessoas_nif ON pessoas(nif);
+CREATE INDEX idx_inscricoes_servico ON inscricoes(servico);
+CREATE INDEX idx_inscricoes_pessoa ON inscricoes(pessoa_id);
+CREATE INDEX idx_inscricoes_lido ON inscricoes(lido, servico);
+CREATE INDEX idx_inscricoes_creche_item ON inscricoes(creche_item_id) WHERE servico = 'CRECHE';
+
+-- Notas:
+-- - Antes de aplicar, fazer backup e planejar migração dos dados existentes.
+-- - O código atual precisará ser ajustado para usar o novo esquema (pessoas/inscricoes/detalhes_*).
+-- - Email/telefone de contacto ficam em contactos_emergencia; origem/lido/secao/formulario estão em inscricoes.
+-- - Campos de pais/responsáveis e moradas completas estão em detalhes_creche.
+--------------------------------------------------------------------
+BEGIN;
+
+-- Garantir enum/tabelas novas (idempotente)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_servico') THEN
+    CREATE TYPE tipo_servico AS ENUM ('ERPI', 'CENTRO_DIA', 'SAD', 'CRECHE');
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS pessoas (
+  id SERIAL PRIMARY KEY,
+  nome_completo TEXT NOT NULL,
+  data_nascimento DATE,
+  cc_bi_numero VARCHAR(50) UNIQUE,
+  nif VARCHAR(50) UNIQUE,
+  niss VARCHAR(50) UNIQUE,
+  numero_utente VARCHAR(50) UNIQUE,
+  morada_completa TEXT NOT NULL,
+  codigo_postal VARCHAR(20) NOT NULL,
+  localidade TEXT NOT NULL,
+  concelho TEXT,
+  distrito TEXT,
+  criado_em TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS contactos_emergencia (
+  id SERIAL PRIMARY KEY,
+  pessoa_id INTEGER REFERENCES pessoas(id) ON DELETE CASCADE,
+  nome TEXT NOT NULL,
+  telefone VARCHAR(30) NOT NULL,
+  email TEXT,
+  parentesco TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS inscricoes (
+  id SERIAL PRIMARY KEY,
+  pessoa_id INTEGER REFERENCES pessoas(id),
+  servico tipo_servico NOT NULL,
+  observacoes TEXT,
+  origem_submissao TEXT,
+  secao_personalizada_id INTEGER,
+  formulario_escolhido TEXT,
+  creche_opcao TEXT,
+  creche_item_id INTEGER,
+  lido BOOLEAN DEFAULT FALSE,
+  lido_em TIMESTAMPTZ,
+  data_inscricao TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS detalhes_sad (
+  inscricao_id INTEGER PRIMARY KEY REFERENCES inscricoes(id) ON DELETE CASCADE,
+  higiene_pessoal BOOLEAN DEFAULT FALSE,
+  periodicidade_higiene_pessoal VARCHAR(30),
+  vezes_higiene_pessoal INTEGER CHECK (vezes_higiene_pessoal BETWEEN 1 AND 5),
+  higiene_habitacional BOOLEAN DEFAULT FALSE,
+  periodicidade_higiene_habitacional VARCHAR(30),
+  vezes_higiene_habitacional INTEGER CHECK (vezes_higiene_habitacional BETWEEN 1 AND 5),
+  refeicoes BOOLEAN DEFAULT FALSE,
+  periodicidade_refeicoes VARCHAR(30),
+  vezes_refeicoes INTEGER CHECK (vezes_refeicoes BETWEEN 1 AND 5),
+  tratamento_roupa BOOLEAN DEFAULT FALSE,
+  periodicidade_tratamento_roupa VARCHAR(30),
+  vezes_tratamento_roupa INTEGER CHECK (vezes_tratamento_roupa BETWEEN 1 AND 5)
+);
+
+CREATE TABLE IF NOT EXISTS detalhes_creche (
+  inscricao_id INTEGER PRIMARY KEY REFERENCES inscricoes(id) ON DELETE CASCADE,
+  crianca_nasceu BOOLEAN NOT NULL,
+  data_prevista DATE,
+  irmaos_frequentam BOOLEAN,
+  necessita_apoio BOOLEAN,
+  apoio_especificacao TEXT,
+  mae_nome TEXT,
+  mae_profissao TEXT,
+  mae_local_emprego TEXT,
+  mae_morada TEXT,
+  mae_codigo_postal VARCHAR(20),
+  mae_localidade TEXT,
+  mae_telemovel VARCHAR(30),
+  mae_email TEXT,
+  pai_nome TEXT,
+  pai_profissao TEXT,
+  pai_local_emprego TEXT,
+  pai_morada TEXT,
+  pai_codigo_postal VARCHAR(20),
+  pai_localidade TEXT,
+  pai_telemovel VARCHAR(30),
+  pai_email TEXT
+);
+
+-- ERPI
+WITH src AS (
+  SELECT * FROM forms_erpi
+),
+p AS (
+  INSERT INTO pessoas (nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+                       morada_completa, codigo_postal, localidade, concelho, distrito, criado_em)
+  SELECT nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+         morada_completa, codigo_postal, concelho, distrito, COALESCE(criado_em, now())
+  FROM src
+  ON CONFLICT (nif) DO NOTHING
+  RETURNING id pessoa_id, nif
+),
+res AS (
+  SELECT s.*, COALESCE(p.pessoa_id, (SELECT id FROM pessoas WHERE nif = s.nif LIMIT 1)) AS pessoa_id
+  FROM src s LEFT JOIN p USING (nif)
+),
+insc AS (
+  INSERT INTO inscricoes (pessoa_id, servico, observacoes, origem_submissao, secao_personalizada_id,
+                          formulario_escolhido, lido, lido_em, data_inscricao)
+  SELECT pessoa_id, 'ERPI', observacoes, origem_submissao, secao_personalizada_id,
+         formulario_escolhido, COALESCE(lido,false), lido_em, COALESCE(criado_em, now())
+  FROM res
+  RETURNING id inscricao_id, data_inscricao, pessoa_id
+)
+INSERT INTO contactos_emergencia (pessoa_id, nome, telefone, email, parentesco)
+SELECT res.pessoa_id, res.contacto_nome_completo, res.contacto_telefone,
+       res.contacto_email, res.contacto_parentesco
+FROM res;
+
+-- CENTRO DE DIA
+WITH src AS (
+  SELECT * FROM forms_centro_de_dia
+),
+p AS (
+  INSERT INTO pessoas (nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+                       morada_completa, codigo_postal, localidade, concelho, distrito, criado_em)
+  SELECT nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+         morada_completa, codigo_postal, concelho, distrito, COALESCE(criado_em, now())
+  FROM src
+  ON CONFLICT (nif) DO NOTHING
+  RETURNING id pessoa_id, nif
+),
+res AS (
+  SELECT s.*, COALESCE(p.pessoa_id, (SELECT id FROM pessoas WHERE nif = s.nif LIMIT 1)) AS pessoa_id
+  FROM src s LEFT JOIN p USING (nif)
+),
+insc AS (
+  INSERT INTO inscricoes (pessoa_id, servico, observacoes, origem_submissao, secao_personalizada_id,
+                          formulario_escolhido, lido, lido_em, data_inscricao)
+  SELECT pessoa_id, 'CENTRO_DIA', observacoes, origem_submissao, secao_personalizada_id,
+         formulario_escolhido, COALESCE(lido,false), lido_em, COALESCE(criado_em, now())
+  FROM res
+  RETURNING id inscricao_id, pessoa_id
+)
+INSERT INTO contactos_emergencia (pessoa_id, nome, telefone, email, parentesco)
+SELECT res.pessoa_id, res.contacto_nome_completo, res.contacto_telefone,
+       res.contacto_email, res.contacto_parentesco
+FROM res;
+
+-- SAD
+WITH src AS (
+  SELECT * FROM forms_sad
+),
+p AS (
+  INSERT INTO pessoas (nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+                       morada_completa, codigo_postal, localidade, concelho, distrito, criado_em)
+  SELECT nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+         morada_completa, codigo_postal, concelho, distrito, COALESCE(criado_em, now())
+  FROM src
+  ON CONFLICT (nif) DO NOTHING
+  RETURNING id pessoa_id, nif
+),
+res AS (
+  SELECT s.*, COALESCE(p.pessoa_id, (SELECT id FROM pessoas WHERE nif = s.nif LIMIT 1)) AS pessoa_id
+  FROM src s LEFT JOIN p USING (nif)
+),
+insc AS (
+  INSERT INTO inscricoes (pessoa_id, servico, observacoes, origem_submissao, secao_personalizada_id,
+                          formulario_escolhido, lido, lido_em, data_inscricao)
+  SELECT pessoa_id, 'SAD', observacoes, origem_submissao, secao_personalizada_id,
+         formulario_escolhido, COALESCE(lido,false), lido_em, COALESCE(criado_em, now())
+  FROM res
+  RETURNING id inscricao_id, pessoa_id, servico
+)
+INSERT INTO detalhes_sad (inscricao_id, higiene_pessoal, periodicidade_higiene_pessoal, vezes_higiene_pessoal,
+                          higiene_habitacional, periodicidade_higiene_habitacional, vezes_higiene_habitacional,
+                          refeicoes, periodicidade_refeicoes, vezes_refeicoes,
+                          tratamento_roupa, periodicidade_tratamento_roupa, vezes_tratamento_roupa)
+SELECT i.inscricao_id,
+       s.higiene_pessoal, s.periodicidade_higiene_pessoal, s.vezes_higiene_pessoal,
+       s.higiene_habitacional, s.periodicidade_higiene_habitacional, s.vezes_higiene_habitacional,
+       s.refeicoes, s.periodicidade_refeicoes, s.vezes_refeicoes,
+       s.tratamento_roupa, s.periodicidade_tratamento_roupa, s.vezes_tratamento_roupa
+FROM insc i
+JOIN res s ON true
+LIMIT (SELECT COUNT(*) FROM res); -- garante correspondência 1:1 na mesma ordem
+
+INSERT INTO contactos_emergencia (pessoa_id, nome, telefone, email, parentesco)
+SELECT res.pessoa_id, res.contacto_nome_completo, res.contacto_telefone,
+       res.contacto_email, res.contacto_parentesco
+FROM res;
+
+-- CRECHE
+WITH src AS (
+  SELECT * FROM forms_creche
+),
+p AS (
+  INSERT INTO pessoas (nome_completo, data_nascimento, cc_bi_numero, nif, niss, numero_utente,
+                       morada_completa, codigo_postal, localidade, concelho, distrito, criado_em)
+  SELECT nome_completo,
+         data_nascimento,
+         cc_bi_numero, nif, niss, numero_utente,
+         morada AS morada_completa,
+         codigo_postal,
+         localidade,
+         NULL::TEXT AS concelho,
+         NULL::TEXT AS distrito,
+         COALESCE(criado_em, now())
+  FROM src
+  ON CONFLICT (nif) DO NOTHING
+  RETURNING id pessoa_id, nif
+),
+res AS (
+  SELECT s.*, COALESCE(p.pessoa_id, (SELECT id FROM pessoas WHERE nif = s.nif LIMIT 1)) AS pessoa_id
+  FROM src s LEFT JOIN p USING (nif)
+),
+insc AS (
+  INSERT INTO inscricoes (pessoa_id, servico, observacoes, origem_submissao, secao_personalizada_id,
+                          formulario_escolhido, creche_opcao, creche_item_id,
+                          lido, lido_em, data_inscricao)
+  SELECT pessoa_id, 'CRECHE', NULL, origem_submissao, secao_personalizada_id,
+         formulario_escolhido, creche_opcao, creche_item_id,
+         COALESCE(lido,false), lido_em, COALESCE(criado_em, now())
+  FROM res
+  RETURNING id inscricao_id, pessoa_id
+)
+INSERT INTO detalhes_creche (inscricao_id, crianca_nasceu, data_prevista, irmaos_frequentam, necessita_apoio, apoio_especificacao,
+                             mae_nome, mae_profissao, mae_local_emprego, mae_morada, mae_codigo_postal, mae_localidade, mae_telemovel, mae_email,
+                             pai_nome, pai_profissao, pai_local_emprego, pai_morada, pai_codigo_postal, pai_localidade, pai_telemovel, pai_email)
+SELECT i.inscricao_id,
+       r.crianca_nasceu,
+       CASE WHEN r.crianca_nasceu THEN NULL ELSE r.data_prevista END,
+       r.irmaos_frequentam,
+       r.necessita_apoio,
+       r.apoio_especificacao,
+       r.mae_nome, r.mae_profissao, r.mae_local_emprego, r.mae_morada, r.mae_codigo_postal, r.mae_localidade, r.mae_telemovel, r.mae_email,
+       r.pai_nome, r.pai_profissao, r.pai_local_emprego, r.pai_morada, r.pai_codigo_postal, r.pai_localidade, r.pai_telemovel, r.pai_email
+FROM insc i
+JOIN res r ON true
+LIMIT (SELECT COUNT(*) FROM res);
+
+COMMIT;
