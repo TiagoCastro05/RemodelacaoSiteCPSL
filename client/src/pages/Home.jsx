@@ -449,6 +449,7 @@ const Home = ({ isEditMode = false }) => {
   const [showTranspModal, setShowTranspModal] = useState(false);
   const [transpSubmitting, setTranspSubmitting] = useState(false);
   const [transpError, setTranspError] = useState("");
+  const [transpEditingDoc, setTranspEditingDoc] = useState(null);
   const [transpForm, setTranspForm] = useState({
     titulo: "",
     descricao: "",
@@ -665,6 +666,7 @@ const Home = ({ isEditMode = false }) => {
   };
 
   const goToTransparencyAdmin = () => {
+    setTranspEditingDoc(null);
     setShowTranspModal(true);
     setTranspError("");
     setTranspSubmitting(false);
@@ -686,11 +688,29 @@ const Home = ({ isEditMode = false }) => {
     }
   };
 
+  const handleTranspEdit = (doc) => {
+    setTranspEditingDoc(doc);
+    setShowTranspModal(true);
+    setTranspError("");
+    setTranspSubmitting(false);
+    setTranspForm({
+      titulo: doc.titulo || "",
+      descricao: doc.descricao || "",
+      ano: (doc.ano || new Date().getFullYear()).toString(),
+      tipo: doc.tipo || "Relatorio",
+      ficheiro: null,
+    });
+  };
+
   const handleTranspSubmit = async (e) => {
     e.preventDefault();
     setTranspError("");
 
-    if (!transpForm.titulo.trim() || !transpForm.ano || !transpForm.ficheiro) {
+    if (
+      !transpForm.titulo.trim() ||
+      !transpForm.ano ||
+      (!transpEditingDoc && !transpForm.ficheiro)
+    ) {
       setTranspError("Preencha título, ano e selecione um ficheiro PDF.");
       return;
     }
@@ -708,17 +728,25 @@ const Home = ({ isEditMode = false }) => {
     const payload = new FormData();
     payload.append("titulo", transpForm.titulo.trim());
     payload.append("ano", transpForm.ano);
-    payload.append("ficheiro", transpForm.ficheiro);
+    if (transpForm.ficheiro) {
+      payload.append("ficheiro", transpForm.ficheiro);
+    }
     if (transpForm.descricao.trim())
       payload.append("descricao", transpForm.descricao.trim());
     payload.append("tipo", safeTipo);
 
     try {
       setTranspSubmitting(true);
-      await api.post("/transparencia", payload, {
+      const endpoint = transpEditingDoc
+        ? `/transparencia/${transpEditingDoc.id}`
+        : "/transparencia";
+      const method = transpEditingDoc ? "put" : "post";
+
+      await api[method](endpoint, payload, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setShowTranspModal(false);
+      setTranspEditingDoc(null);
       await fetchTransparencia();
     } catch (error) {
       const msg =
@@ -728,6 +756,24 @@ const Home = ({ isEditMode = false }) => {
       setTranspError(msg);
     } finally {
       setTranspSubmitting(false);
+    }
+  };
+
+  const handleTranspDelete = async (docId) => {
+    const confirmed = window.confirm(
+      "Tem a certeza que deseja eliminar este documento?"
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/transparencia/${docId}`);
+      await fetchTransparencia();
+    } catch (error) {
+      const msg =
+        error.response?.data?.message ||
+        error.message ||
+        "Erro ao eliminar documento.";
+      setTranspError(msg);
     }
   };
 
@@ -1412,6 +1458,24 @@ const Home = ({ isEditMode = false }) => {
             <div className="transparency-grid">
               {transparenciaDocs.map((doc) => (
                 <div key={doc.id} className="transparency-card">
+                  {isEditMode && user && (
+                    <div className="transparency-actions">
+                      <button
+                        className="btn-edit-inline"
+                        title="Editar documento"
+                        onClick={() => handleTranspEdit(doc)}
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="btn-delete-inline"
+                        title="Eliminar documento"
+                        onClick={() => handleTranspDelete(doc.id)}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  )}
                   <div className="transparency-thumb">
                     <img
                       src={PDF_PLACEHOLDER}
@@ -3954,14 +4018,24 @@ const Home = ({ isEditMode = false }) => {
       {showTranspModal && (
         <div
           className="edit-modal-overlay"
-          onClick={() => setShowTranspModal(false)}
+          onClick={() => {
+            setShowTranspModal(false);
+            setTranspEditingDoc(null);
+          }}
         >
           <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
             <div className="edit-modal-header">
-              <h3>Adicionar documento de transparência</h3>
+              <h3>
+                {transpEditingDoc
+                  ? "Editar documento de transparência"
+                  : "Adicionar documento de transparência"}
+              </h3>
               <button
                 className="btn-close"
-                onClick={() => setShowTranspModal(false)}
+                onClick={() => {
+                  setShowTranspModal(false);
+                  setTranspEditingDoc(null);
+                }}
               >
                 ✕
               </button>
@@ -4024,17 +4098,24 @@ const Home = ({ isEditMode = false }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="transp-ficheiro">Ficheiro PDF *</label>
+                <label htmlFor="transp-ficheiro">
+                  {transpEditingDoc
+                    ? "Substituir ficheiro (PDF)"
+                    : "Ficheiro PDF *"}
+                </label>
                 <input
                   id="transp-ficheiro"
                   name="ficheiro"
                   type="file"
                   accept="application/pdf"
                   onChange={handleTranspChange}
-                  required
+                  required={!transpEditingDoc}
                 />
                 {transpForm.ficheiro && (
                   <small>Selecionado: {transpForm.ficheiro.name}</small>
+                )}
+                {transpEditingDoc && !transpForm.ficheiro && (
+                  <small>Ficheiro atual será mantido.</small>
                 )}
               </div>
 
@@ -4055,7 +4136,13 @@ const Home = ({ isEditMode = false }) => {
                   className="btn-primary"
                   disabled={transpSubmitting}
                 >
-                  {transpSubmitting ? "A enviar..." : "Guardar documento"}
+                  {transpSubmitting
+                    ? transpEditingDoc
+                      ? "A atualizar..."
+                      : "A enviar..."
+                    : transpEditingDoc
+                    ? "Atualizar documento"
+                    : "Guardar documento"}
                 </button>
               </div>
             </form>
