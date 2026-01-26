@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect } from "react";
 
 export const AccessibilityContext = createContext();
 
-const FONT_SIZES = ["normal", "large", "xlarge", "xxlarge"];
+const FONT_SIZES = ["normal", "large", "xlarge", "xxlarge", "xxxlarge"];
 
 export const AccessibilityProvider = ({ children }) => {
   const [fontSize, setFontSize] = useState("normal");

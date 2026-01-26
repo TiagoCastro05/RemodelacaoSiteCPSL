@@ -38,6 +38,9 @@ body {
 .font-xxlarge {
   font-size: 22px;
 }
+.font-xxxlarge {
+  font-size: 24px;
+}
 
 /* Escala global de texto (inclui navbar e demais elementos) */
 .font-normal {
@@ -52,6 +55,9 @@ body {
 .font-xxlarge {
   font-size: 22px;
 }
+.font-xxxlarge {
+  font-size: 24px;
+}
 
 /* Escala progressiva: +2px no large, +4px no xlarge (navbar fica fixa) */
 body.font-large p,
@@ -61,20 +67,40 @@ body.font-large span,
 body.font-large button,
 body.font-large input,
 body.font-large textarea,
-body.font-large select {
+body.font-large select,
+body.font-large div {
   font-size: 18px;
 }
 
-body.font-large h1 { font-size: 50px; }
-body.font-large h2 { font-size: 38px; }
-body.font-large h3 { font-size: 30px; }
-body.font-large h4 { font-size: 22px; }
-body.font-large h5 { font-size: 20px; }
-body.font-large h6 { font-size: 18px; }
+body.font-large h1 {
+  font-size: 50px;
+}
+body.font-large h2 {
+  font-size: 38px;
+}
+body.font-large h3 {
+  font-size: 30px;
+}
+body.font-large h4 {
+  font-size: 22px;
+}
+body.font-large h5 {
+  font-size: 20px;
+}
+body.font-large h6 {
+  font-size: 18px;
+}
 
-body.font-large .hero-section h1 { font-size: 58px; }
-body.font-large .hero-section p { font-size: 26px; }
-body.font-large .hero-section .btn-primary { font-size: 18px; padding: 14px 36px; }
+body.font-large .hero-section h1 {
+  font-size: 58px;
+}
+body.font-large .hero-section p {
+  font-size: 26px;
+}
+body.font-large .hero-section .btn-primary {
+  font-size: 18px;
+  padding: 14px 36px;
+}
 
 body.font-xlarge p,
 body.font-xlarge li,
@@ -83,20 +109,40 @@ body.font-xlarge span,
 body.font-xlarge button,
 body.font-xlarge input,
 body.font-xlarge textarea,
-body.font-xlarge select {
+body.font-xlarge select,
+body.font-xlarge div {
   font-size: 20px;
 }
 
-body.font-xlarge h1 { font-size: 52px; }
-body.font-xlarge h2 { font-size: 40px; }
-body.font-xlarge h3 { font-size: 32px; }
-body.font-xlarge h4 { font-size: 24px; }
-body.font-xlarge h5 { font-size: 22px; }
-body.font-xlarge h6 { font-size: 20px; }
+body.font-xlarge h1 {
+  font-size: 52px;
+}
+body.font-xlarge h2 {
+  font-size: 40px;
+}
+body.font-xlarge h3 {
+  font-size: 32px;
+}
+body.font-xlarge h4 {
+  font-size: 24px;
+}
+body.font-xlarge h5 {
+  font-size: 22px;
+}
+body.font-xlarge h6 {
+  font-size: 20px;
+}
 
-body.font-xlarge .hero-section h1 { font-size: 60px; }
-body.font-xlarge .hero-section p { font-size: 28px; }
-body.font-xlarge .hero-section .btn-primary { font-size: 19px; padding: 15px 38px; }
+body.font-xlarge .hero-section h1 {
+  font-size: 60px;
+}
+body.font-xlarge .hero-section p {
+  font-size: 28px;
+}
+body.font-xlarge .hero-section .btn-primary {
+  font-size: 19px;
+  padding: 15px 38px;
+}
 
 body.font-xxlarge p,
 body.font-xxlarge li,
@@ -105,36 +151,149 @@ body.font-xxlarge span,
 body.font-xxlarge button,
 body.font-xxlarge input,
 body.font-xxlarge textarea,
-body.font-xxlarge select {
+body.font-xxlarge select,
+body.font-xxlarge div {
   font-size: 22px;
 }
 
-body.font-xxlarge h1 { font-size: 54px; }
-body.font-xxlarge h2 { font-size: 42px; }
-body.font-xxlarge h3 { font-size: 34px; }
-body.font-xxlarge h4 { font-size: 26px; }
-body.font-xxlarge h5 { font-size: 24px; }
-body.font-xxlarge h6 { font-size: 22px; }
+body.font-xxlarge h1 {
+  font-size: 54px;
+}
+body.font-xxlarge h2 {
+  font-size: 42px;
+}
+body.font-xxlarge h3 {
+  font-size: 34px;
+}
+body.font-xxlarge h4 {
+  font-size: 26px;
+}
+body.font-xxlarge h5 {
+  font-size: 24px;
+}
+body.font-xxlarge h6 {
+  font-size: 22px;
+}
 
-body.font-xxlarge .hero-section h1 { font-size: 62px; }
-body.font-xxlarge .hero-section p { font-size: 30px; }
-body.font-xxlarge .hero-section .btn-primary { font-size: 20px; padding: 16px 40px; }
+body.font-xxlarge .hero-section h1 {
+  font-size: 62px;
+}
+body.font-xxlarge .hero-section p {
+  font-size: 30px;
+}
+body.font-xxlarge .hero-section .btn-primary {
+  font-size: 20px;
+  padding: 16px 40px;
+}
+
+/* Nível 5 - XXXLARGE */
+body.font-xxxlarge p,
+body.font-xxxlarge li,
+body.font-xxxlarge label,
+body.font-xxxlarge span,
+body.font-xxxlarge button,
+body.font-xxxlarge input,
+body.font-xxxlarge textarea,
+body.font-xxxlarge select,
+body.font-xxxlarge div {
+  font-size: 24px;
+}
+
+body.font-xxxlarge h1 {
+  font-size: 58px;
+}
+body.font-xxxlarge h2 {
+  font-size: 46px;
+}
+body.font-xxxlarge h3 {
+  font-size: 38px;
+}
+body.font-xxxlarge h4 {
+  font-size: 30px;
+}
+body.font-xxxlarge h5 {
+  font-size: 28px;
+}
+body.font-xxxlarge h6 {
+  font-size: 26px;
+}
+
+body.font-xxxlarge .hero-section h1 {
+  font-size: 66px;
+}
+body.font-xxxlarge .hero-section p {
+  font-size: 32px;
+}
+body.font-xxxlarge .hero-section .btn-primary {
+  font-size: 22px;
+  padding: 18px 44px;
+}
+
+/* Garantir que textos dentro dos cards também aumentam */
+body.font-large .content-subsection p,
+body.font-large .content-subsection div,
+body.font-large .content-preview,
+body.font-large .content-preview *,
+body.font-large .content-summary,
+body.font-large .project-description,
+body.font-large .noticia-summary {
+  font-size: 18px !important;
+}
+
+body.font-xlarge .content-subsection p,
+body.font-xlarge .content-subsection div,
+body.font-xlarge .content-preview,
+body.font-xlarge .content-preview *,
+body.font-xlarge .content-summary,
+body.font-xlarge .project-description,
+body.font-xlarge .noticia-summary {
+  font-size: 20px !important;
+}
+
+body.font-xxlarge .content-subsection p,
+body.font-xxlarge .content-subsection div,
+body.font-xxlarge .content-preview,
+body.font-xxlarge .content-preview *,
+body.font-xxlarge .content-summary,
+body.font-xxlarge .project-description,
+body.font-xxlarge .noticia-summary {
+  font-size: 22px !important;
+}
+
+body.font-xxxlarge .content-subsection p,
+body.font-xxxlarge .content-subsection div,
+body.font-xxxlarge .content-preview,
+body.font-xxxlarge .content-preview *,
+body.font-xxxlarge .content-summary,
+body.font-xxxlarge .project-description,
+body.font-xxxlarge .noticia-summary {
+  font-size: 24px !important;
+}
 
 /* Fixar tamanhos da navbar/logo para não escalarem */
-.main-header h1 { font-size: 1.8rem; }
-.main-header span { font-size: 0.75rem; }
-.main-nav a, .header-logo a { font-size: 0.95rem; }
+.main-header h1 {
+  font-size: 1.8rem;
+}
+.main-header span {
+  font-size: 0.75rem;
+}
+.main-nav a,
+.header-logo a {
+  font-size: 0.95rem;
+}
 
 /* Reforço: impedir scaling do logo/título no header quando fonte aumenta */
 body.font-large .main-header .header-logo h1,
 body.font-xlarge .main-header .header-logo h1,
-body.font-xxlarge .main-header .header-logo h1 {
+body.font-xxlarge .main-header .header-logo h1,
+body.font-xxxlarge .main-header .header-logo h1 {
   font-size: 1.8rem !important;
 }
 
 body.font-large .main-header .header-logo span,
 body.font-xlarge .main-header .header-logo span,
-body.font-xxlarge .main-header .header-logo span {
+body.font-xxlarge .main-header .header-logo span,
+body.font-xxxlarge .main-header .header-logo span {
   font-size: 0.75rem !important;
 }
 body.font-xlarge .fixed-navbar,
@@ -151,6 +310,14 @@ body.font-xxlarge .navbar-content a,
 body.font-xxlarge .nav-links a,
 body.font-xxlarge .nav-links a *,
 body.font-xxlarge .navbar-content * {
+  font-size: 16px !important;
+}
+body.font-xxxlarge .fixed-navbar,
+body.font-xxxlarge .navbar-content,
+body.font-xxxlarge .navbar-content a,
+body.font-xxxlarge .nav-links a,
+body.font-xxxlarge .nav-links a *,
+body.font-xxxlarge .navbar-content * {
   font-size: 16px !important;
 }
 
@@ -180,7 +347,6 @@ body.font-xxlarge .navbar-content * {
 .high-contrast .header,
 .high-contrast footer,
 .high-contrast .contact-form,
-.high-contrast .hero-section,
 .high-contrast .dashboard,
 .high-contrast .form-container,
 .high-contrast .login-card,
@@ -228,9 +394,6 @@ body.font-xxlarge .navbar-content * {
 .high-contrast .nav-links a,
 .high-contrast .nav-links a:hover,
 .high-contrast header,
-.high-contrast .hero-section,
-.high-contrast .hero-section h1,
-.high-contrast .hero-section p,
 .high-contrast .btn-primary,
 .high-contrast .btn-edit-inline,
 .high-contrast .btn-edit-inline:hover,
@@ -243,14 +406,42 @@ body.font-xxlarge .navbar-content * {
   border-color: #fff !important;
 }
 
+/* Hero section mantém a imagem mas com overlay escuro para contraste */
+.high-contrast .hero-section {
+  position: relative;
+  color: #fff !important;
+}
+
+.high-contrast .hero-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85) !important;
+  z-index: 0;
+}
+
+.high-contrast .hero-section h1,
+.high-contrast .hero-section p {
+  position: relative;
+  z-index: 1;
+  color: #fff !important;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.high-contrast .hero-section .container {
+  position: relative;
+  z-index: 1;
+}
+
 .high-contrast .nav-links a,
 .high-contrast .hero-section a {
   color: #fff !important;
   text-decoration: underline;
-}
-
-.high-contrast .hero-section {
-  box-shadow: none !important;
+  position: relative;
+  z-index: 1;
 }
 
 .high-contrast .project-item,
