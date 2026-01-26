@@ -1,11 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="pt-PT">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/Logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Centro Paroquial e Social de Lanheses" />
+    <meta name="theme-color" content="#ff9966" />
+
+    <!-- Meta Tags Básicas para SEO -->
+    <meta
+      name="description"
+      content="Centro Paroquial e Social de Lanheses - IPSS dedicada ao apoio social a Pessoas Mais Velhas e à Infância. Oferecemos respostas sociais de qualidade em Lanheses, Viana do Castelo."
+    />
+    <meta
+      name="keywords"
+      content="CPSL, Centro Paroquial Lanheses, IPSS, apoio social, terceira idade, infância, respostas sociais, Lanheses, Viana do Castelo"
+    />
+    <meta name="author" content="Centro Paroquial e Social de Lanheses" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cpsl.pt/" />
+    <meta
+      property="og:title"
+      content="CPSL - Centro Paroquial e Social de Lanheses"
+    />
+    <meta
+      property="og:description"
+      content="Instituição Particular de Solidariedade Social dedicada ao apoio à Pessoas Mais Velhas e à Infância em Lanheses, Viana do Castelo."
+    />
+    <meta property="og:image" content="%PUBLIC_URL%/Logo.png" />
+    <meta property="og:locale" content="pt_PT" />
+    <meta property="og:site_name" content="CPSL" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="CPSL - Centro Paroquial e Social de Lanheses"
+    />
+    <meta
+      name="twitter:description"
+      content="IPSS dedicada ao apoio social a Pessoas Mais Velhas e à Infância em Lanheses, Viana do Castelo."
+    />
+    <meta name="twitter:image" content="%PUBLIC_URL%/Logo.png" />
+
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/Logo.png" />
     <!--
       manifest.json provides metadata used when your web app is installed on a
@@ -22,6 +61,37 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>CPSL - Centro Paroquial e Social de Lanheses</title>
+
+    <!-- Schema.org Structured Data para melhor SEO -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "NGO",
+        "name": "Centro Paroquial e Social de Lanheses",
+        "alternateName": "CPSL",
+        "url": "https://cpsl.pt",
+        "logo": "https://cpsl.pt/Logo.png",
+        "description": "Instituição Particular de Solidariedade Social (IPSS) dedicada ao apoio social a Pessoas Mais Velhas e à Infância em Lanheses, Viana do Castelo.",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Lanheses",
+          "addressRegion": "Viana do Castelo",
+          "addressCountry": "PT"
+        },
+        "areaServed": {
+          "@type": "Place",
+          "name": "Lanheses, Viana do Castelo, Portugal"
+        },
+        "knowsAbout": [
+          "Apoio Social",
+          "Terceira Idade",
+          "Infância",
+          "Serviços Comunitários",
+          "IPSS",
+          "Respostas Sociais"
+        ]
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

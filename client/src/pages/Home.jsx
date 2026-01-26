@@ -8,13 +8,13 @@ import "../styles/Home.css";
 const PLACEHOLDER_SVG =
   `data:image/svg+xml;utf8,` +
   encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'><rect fill='#f6f7fb' width='100%' height='100%'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#888' font-size='28' font-family='Arial, sans-serif'>Imagem</text></svg>`
+    `<svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'><rect fill='#f6f7fb' width='100%' height='100%'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#888' font-size='28' font-family='Arial, sans-serif'>Imagem</text></svg>`,
   );
 
 const PDF_PLACEHOLDER =
   `data:image/svg+xml;utf8,` +
   encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='350'><rect fill='#0b1930' width='100%' height='100%'/><rect x='40' y='30' rx='18' ry='18' width='520' height='290' fill='#132844' stroke='#4da3ff' stroke-width='6'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='#4da3ff' font-size='64' font-family='Arial, sans-serif' font-weight='700'>PDF</text></svg>`
+    `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='350'><rect fill='#0b1930' width='100%' height='100%'/><rect x='40' y='30' rx='18' ry='18' width='520' height='290' fill='#132844' stroke='#4da3ff' stroke-width='6'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='#4da3ff' font-size='64' font-family='Arial, sans-serif' font-weight='700'>PDF</text></svg>`,
   );
 
 const DEFAULT_HERO = {
@@ -340,7 +340,7 @@ const Home = ({ isEditMode = false }) => {
   const [selectedResposta, setSelectedResposta] = useState(null);
   const [secoesPersonalizadas, setSecoesPersonalizadas] = useState([]);
   const [itensSecoesPersonalizadas, setItensSecoesPersonalizadas] = useState(
-    {}
+    {},
   );
   const [loadingSecoes, setLoadingSecoes] = useState(true);
   const [editingSecaoPersonalizada, setEditingSecaoPersonalizada] =
@@ -464,7 +464,7 @@ const Home = ({ isEditMode = false }) => {
         const response = await api.get("/projetos");
         // Filtrar apenas projetos ativos
         const activeProjects = (response.data.data || []).filter(
-          (project) => project.ativo
+          (project) => project.ativo,
         );
         setProjects(activeProjects);
       } catch (error) {
@@ -610,7 +610,7 @@ const Home = ({ isEditMode = false }) => {
           const itensMap = {};
           for (const secao of secoes) {
             const itensResp = await api.get(
-              `/secoes-personalizadas/${secao.id}/itens`
+              `/secoes-personalizadas/${secao.id}/itens`,
             );
             if (itensResp.data.success) {
               itensMap[secao.id] = itensResp.data.data || [];
@@ -648,7 +648,7 @@ const Home = ({ isEditMode = false }) => {
     section,
     data = {},
     id = null,
-    secaoPersonalizadaData = null
+    secaoPersonalizadaData = null,
   ) => {
     lastFocusedRef.current = document.activeElement;
     setEditingSection(section);
@@ -663,7 +663,7 @@ const Home = ({ isEditMode = false }) => {
   // Adicionar nova subseção
   const handleAddSubsection = (
     section = "instituicao",
-    secaoPersonalizadaData = null
+    secaoPersonalizadaData = null,
   ) => {
     lastFocusedRef.current = document.activeElement;
     console.log("handleAddSubsection - section:", section);
@@ -795,7 +795,7 @@ const Home = ({ isEditMode = false }) => {
 
   const handleTranspDelete = async (docId) => {
     const confirmed = window.confirm(
-      "Tem a certeza que deseja eliminar este documento?"
+      "Tem a certeza que deseja eliminar este documento?",
     );
     if (!confirmed) return;
 
@@ -821,7 +821,7 @@ const Home = ({ isEditMode = false }) => {
         // Criar item de seção personalizada
         response = await api.post(
           `/secoes-personalizadas/${editingSecaoPersonalizada.id}/itens`,
-          editingData
+          editingData,
         );
         if (response.data.success) {
           // Atualizar lista de itens da seção
@@ -879,7 +879,7 @@ const Home = ({ isEditMode = false }) => {
         setItensSecoesPersonalizadas({
           ...itensSecoesPersonalizadas,
           [secaoId]: (itensSecoesPersonalizadas[secaoId] || []).filter(
-            (item) => item.id !== id
+            (item) => item.id !== id,
           ),
         });
       } else if (section === "respostas-sociais") {
@@ -891,7 +891,7 @@ const Home = ({ isEditMode = false }) => {
       } else {
         await api.delete(`/conteudo/${id}`);
         setConteudoInstitucional(
-          conteudoInstitucional.filter((c) => c.id !== id)
+          conteudoInstitucional.filter((c) => c.id !== id),
         );
       }
       alert("Item eliminado com sucesso!");
@@ -941,7 +941,7 @@ const Home = ({ isEditMode = false }) => {
   const focusFirstElement = (ref) => {
     if (!ref?.current) return;
     const el = ref.current.querySelector(
-      'input, select, textarea, button, [tabindex]:not([tabindex="-1"])'
+      'input, select, textarea, button, [tabindex]:not([tabindex="-1"])',
     );
     if (el) el.focus();
   };
@@ -995,14 +995,14 @@ const Home = ({ isEditMode = false }) => {
       ) {
         await api.put(
           `/secoes-personalizadas/${editingSecaoPersonalizada.id}/itens/${editingId}`,
-          editingData
+          editingData,
         );
         setItensSecoesPersonalizadas({
           ...itensSecoesPersonalizadas,
           [editingSecaoPersonalizada.id]: (
             itensSecoesPersonalizadas[editingSecaoPersonalizada.id] || []
           ).map((item) =>
-            item.id === editingId ? { ...item, ...editingData } : item
+            item.id === editingId ? { ...item, ...editingData } : item,
           ),
         });
         closeEditModal();
@@ -1011,8 +1011,8 @@ const Home = ({ isEditMode = false }) => {
         await api.put(`/conteudo/${editingId}`, editingData);
         setConteudoInstitucional(
           conteudoInstitucional.map((c) =>
-            c.id === editingId ? { ...c, ...editingData } : c
-          )
+            c.id === editingId ? { ...c, ...editingData } : c,
+          ),
         );
         closeEditModal();
         alert("Conteúdo atualizado com sucesso!");
@@ -1020,8 +1020,8 @@ const Home = ({ isEditMode = false }) => {
         await api.put(`/respostas-sociais/${editingId}`, editingData);
         setRespostasSociais(
           respostasSociais.map((r) =>
-            r.id === editingId ? { ...r, ...editingData } : r
-          )
+            r.id === editingId ? { ...r, ...editingData } : r,
+          ),
         );
         closeEditModal();
         alert("Resposta Social atualizada com sucesso!");
@@ -1029,8 +1029,8 @@ const Home = ({ isEditMode = false }) => {
         await api.put(`/noticias/${editingId}`, editingData);
         setNoticias(
           noticias.map((n) =>
-            n.id === editingId ? { ...n, ...editingData } : n
-          )
+            n.id === editingId ? { ...n, ...editingData } : n,
+          ),
         );
         closeEditModal();
         alert("Notícia atualizada com sucesso!");
@@ -1042,9 +1042,7 @@ const Home = ({ isEditMode = false }) => {
         };
 
         const response = await api.put("/hero", payload);
-        const savedHero = normalizeHeroConfig(
-          response.data?.data || payload
-        );
+        const savedHero = normalizeHeroConfig(response.data?.data || payload);
         setHeroConfig(savedHero);
         localStorage.setItem("heroConfig", JSON.stringify(savedHero));
         closeEditModal();
@@ -1125,35 +1123,43 @@ const Home = ({ isEditMode = false }) => {
               reconhecida pelo seu espírito inovador.
             </p>
           ) : (
-            <div className="content-grid">
+            <div className="institutional-content">
               {conteudoInstitucional.map((content) => (
-                <div key={content.id} className="content-card">
-                  {isEditMode && user && (
-                    <div className="subsection-actions">
-                      <button
-                        className="btn-edit-inline"
-                        onClick={() => handleEdit("institucional", content, content.id)}
-                        title="Editar"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="btn-delete-inline"
-                        onClick={() => handleDelete(content.id, "institucional")}
-                        title="Eliminar"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  )}
+                <div key={content.id} className="content-subsection">
+                  <div className="subsection-header">
+                    <h3>{content.titulo}</h3>
+                    {isEditMode && user && (
+                      <div className="subsection-actions">
+                        <button
+                          className="btn-edit-inline"
+                          onClick={() =>
+                            handleEdit("institucional", content, content.id)
+                          }
+                          title="Editar"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="btn-delete-inline"
+                          onClick={() =>
+                            handleDelete(content.id, "institucional")
+                          }
+                          title="Eliminar"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                  <h3>{content.titulo}</h3>
-                  <p
-                    className="content-summary"
-                    style={{ fontStyle: "italic", marginTop: 8 }}
-                  >
-                    {content.subtitulo}
-                  </p>
+                  {content.subtitulo && (
+                    <p
+                      className="content-summary"
+                      style={{ fontStyle: "italic", marginTop: 8 }}
+                    >
+                      {content.subtitulo}
+                    </p>
+                  )}
                   <div
                     className="content-preview"
                     dangerouslySetInnerHTML={{ __html: content.conteudo || "" }}
@@ -1230,7 +1236,7 @@ const Home = ({ isEditMode = false }) => {
                       <p className="project-date">
                         🗓️ Início:{" "}
                         {new Date(project.data_inicio).toLocaleDateString(
-                          "pt-PT"
+                          "pt-PT",
                         )}
                       </p>
                     )}
@@ -1288,7 +1294,7 @@ const Home = ({ isEditMode = false }) => {
                             handleEdit(
                               "respostas-sociais",
                               resposta,
-                              resposta.id
+                              resposta.id,
                             );
                           }}
                           title="Editar"
@@ -1403,7 +1409,7 @@ const Home = ({ isEditMode = false }) => {
                   <p className="noticia-date">
                     📅{" "}
                     {new Date(
-                      noticia.data_publicacao || noticia.created_at
+                      noticia.data_publicacao || noticia.created_at,
                     ).toLocaleDateString("pt-PT")}
                   </p>
 
@@ -1492,7 +1498,7 @@ const Home = ({ isEditMode = false }) => {
                       {doc.ano ? `Ano: ${doc.ano}` : ""}
                       {doc.data_criacao
                         ? `${doc.ano ? " · " : ""}${formatDate(
-                            doc.data_criacao
+                            doc.data_criacao,
                           )}`
                         : ""}
                     </p>
@@ -1523,15 +1529,15 @@ const Home = ({ isEditMode = false }) => {
         const formOptions = isMultipleForm
           ? formConfig.opcoes || []
           : formConfig
-          ? [{ tipo: formConfig.tipo, label: formConfig.label }]
-          : [];
+            ? [{ tipo: formConfig.tipo, label: formConfig.label }]
+            : [];
         const selectedFormType = formConfig
           ? isMultipleForm
             ? formSelections[secao.id] || formOptions[0]?.tipo
             : formOptions[0]?.tipo
           : null;
         const selectedFormLabel = formOptions.find(
-          (o) => o.tipo === selectedFormType
+          (o) => o.tipo === selectedFormType,
         )?.label;
 
         const crecheSections = secoesPersonalizadas.filter((s) => {
@@ -1601,7 +1607,7 @@ const Home = ({ isEditMode = false }) => {
                                 "secao-personalizada",
                                 item,
                                 item.id,
-                                secao
+                                secao,
                               )
                             }
                             title="Editar"
@@ -1614,7 +1620,7 @@ const Home = ({ isEditMode = false }) => {
                               handleDelete(
                                 item.id,
                                 "secao-personalizada",
-                                secao.id
+                                secao.id,
                               )
                             }
                             title="Eliminar"
@@ -1690,7 +1696,7 @@ const Home = ({ isEditMode = false }) => {
                                 "secao-personalizada",
                                 item,
                                 item.id,
-                                secao
+                                secao,
                               );
                             }}
                             title="Editar"
@@ -1704,7 +1710,7 @@ const Home = ({ isEditMode = false }) => {
                               handleDelete(
                                 item.id,
                                 "secao-personalizada",
-                                secao.id
+                                secao.id,
                               );
                             }}
                             title="Eliminar"
@@ -1770,7 +1776,7 @@ const Home = ({ isEditMode = false }) => {
                                   "secao-personalizada",
                                   item,
                                   item.id,
-                                  secao
+                                  secao,
                                 );
                               }}
                               title="Editar"
@@ -1784,7 +1790,7 @@ const Home = ({ isEditMode = false }) => {
                                 handleDelete(
                                   item.id,
                                   "secao-personalizada",
-                                  secao.id
+                                  secao.id,
                                 );
                               }}
                               title="Eliminar"
@@ -1849,7 +1855,7 @@ const Home = ({ isEditMode = false }) => {
                                   "secao-personalizada",
                                   item,
                                   item.id,
-                                  secao
+                                  secao,
                                 );
                               }}
                               title="Editar"
@@ -1863,7 +1869,7 @@ const Home = ({ isEditMode = false }) => {
                                 handleDelete(
                                   item.id,
                                   "secao-personalizada",
-                                  secao.id
+                                  secao.id,
                                 );
                               }}
                               title="Eliminar"
@@ -1921,7 +1927,7 @@ const Home = ({ isEditMode = false }) => {
                       onClick={async () => {
                         if (
                           window.confirm(
-                            "Tem certeza que deseja remover o formulário desta secção?"
+                            "Tem certeza que deseja remover o formulário desta secção?",
                           )
                         ) {
                           try {
@@ -1931,7 +1937,7 @@ const Home = ({ isEditMode = false }) => {
                                 ...secao,
                                 tem_formulario: false,
                                 config_formulario: null,
-                              }
+                              },
                             );
                             setSecoesPersonalizadas(
                               secoesPersonalizadas.map((s) =>
@@ -1941,8 +1947,8 @@ const Home = ({ isEditMode = false }) => {
                                       tem_formulario: false,
                                       config_formulario: null,
                                     }
-                                  : s
-                              )
+                                  : s,
+                              ),
                             );
                             alert("Formulário removido com sucesso!");
                           } catch (error) {
@@ -2020,7 +2026,7 @@ const Home = ({ isEditMode = false }) => {
                           try {
                             const resp = await api.post(
                               "/contactos/form",
-                              data
+                              data,
                             );
                             if (resp.data && resp.data.success) {
                               alert("Mensagem enviada. Obrigado!");
@@ -2153,7 +2159,7 @@ const Home = ({ isEditMode = false }) => {
                             const resp = await api.post("/forms/erpi", data);
                             if (resp.data?.success) {
                               alert(
-                                "Inscrição ERPI enviada. Entraremos em contacto."
+                                "Inscrição ERPI enviada. Entraremos em contacto.",
                               );
                               form.reset();
                             } else {
@@ -2413,7 +2419,7 @@ const Home = ({ isEditMode = false }) => {
                           const form = e.currentTarget;
 
                           const selectedCrecheInput = form.querySelector(
-                            'input[name="creche_item_id"]:checked'
+                            'input[name="creche_item_id"]:checked',
                           );
                           const creche_item_id_value =
                             selectedCrecheInput?.value &&
@@ -2496,7 +2502,7 @@ const Home = ({ isEditMode = false }) => {
                             const resp = await api.post("/forms/creche", data);
                             if (resp.data?.success) {
                               alert(
-                                "Inscrição Creche enviada. Entraremos em contacto."
+                                "Inscrição Creche enviada. Entraremos em contacto.",
                               );
                               form.reset();
                             } else {
@@ -2913,7 +2919,7 @@ const Home = ({ isEditMode = false }) => {
                                   value="sim"
                                   onChange={() => {
                                     const wrap = document.getElementById(
-                                      `apoio-wrap-${secao.id}`
+                                      `apoio-wrap-${secao.id}`,
                                     );
                                     if (wrap) wrap.style.display = "block";
                                   }}
@@ -2928,7 +2934,7 @@ const Home = ({ isEditMode = false }) => {
                                   defaultChecked
                                   onChange={() => {
                                     const wrap = document.getElementById(
-                                      `apoio-wrap-${secao.id}`
+                                      `apoio-wrap-${secao.id}`,
                                     );
                                     if (wrap) wrap.style.display = "none";
                                   }}
@@ -3024,11 +3030,11 @@ const Home = ({ isEditMode = false }) => {
                           try {
                             const resp = await api.post(
                               "/forms/centro-de-dia",
-                              data
+                              data,
                             );
                             if (resp.data?.success) {
                               alert(
-                                "Inscrição Centro de Dia enviada. Entraremos em contacto."
+                                "Inscrição Centro de Dia enviada. Entraremos em contacto.",
                               );
                               form.reset();
                             } else {
@@ -3368,7 +3374,7 @@ const Home = ({ isEditMode = false }) => {
                             const resp = await api.post("/forms/sad", data);
                             if (resp.data?.success) {
                               alert(
-                                "Inscrição SAD enviada. Entraremos em contacto."
+                                "Inscrição SAD enviada. Entraremos em contacto.",
                               );
                               form.reset();
                             } else {
@@ -3619,7 +3625,7 @@ const Home = ({ isEditMode = false }) => {
                                 id={`higiene_pessoal-${secao.id}`}
                                 onChange={(e) => {
                                   const wrap = document.getElementById(
-                                    `wrap-higiene_pessoal-${secao.id}`
+                                    `wrap-higiene_pessoal-${secao.id}`,
                                   );
                                   if (wrap)
                                     wrap.style.display = e.target.checked
@@ -3684,7 +3690,7 @@ const Home = ({ isEditMode = false }) => {
                                 id={`higiene_habitacional-${secao.id}`}
                                 onChange={(e) => {
                                   const wrap = document.getElementById(
-                                    `wrap-higiene_habitacional-${secao.id}`
+                                    `wrap-higiene_habitacional-${secao.id}`,
                                   );
                                   if (wrap)
                                     wrap.style.display = e.target.checked
@@ -3752,7 +3758,7 @@ const Home = ({ isEditMode = false }) => {
                                 id={`refeicoes-${secao.id}`}
                                 onChange={(e) => {
                                   const wrap = document.getElementById(
-                                    `wrap-refeicoes-${secao.id}`
+                                    `wrap-refeicoes-${secao.id}`,
                                   );
                                   if (wrap)
                                     wrap.style.display = e.target.checked
@@ -3817,7 +3823,7 @@ const Home = ({ isEditMode = false }) => {
                                 id={`tratamento_roupa-${secao.id}`}
                                 onChange={(e) => {
                                   const wrap = document.getElementById(
-                                    `wrap-tratamento_roupa-${secao.id}`
+                                    `wrap-tratamento_roupa-${secao.id}`,
                                   );
                                   if (wrap)
                                     wrap.style.display = e.target.checked
@@ -4134,8 +4140,8 @@ const Home = ({ isEditMode = false }) => {
                       ? "A atualizar..."
                       : "A enviar..."
                     : transpEditingDoc
-                    ? "Atualizar documento"
-                    : "Guardar documento"}
+                      ? "Atualizar documento"
+                      : "Guardar documento"}
                 </button>
               </div>
             </form>
@@ -4204,7 +4210,7 @@ const Home = ({ isEditMode = false }) => {
                                   formData.append("file", f);
                                   formData.append(
                                     "tabela_referencia",
-                                    "conteudo_institucional"
+                                    "conteudo_institucional",
                                   );
                                   const response = await api.post(
                                     "/media",
@@ -4213,14 +4219,14 @@ const Home = ({ isEditMode = false }) => {
                                       headers: {
                                         "Content-Type": "multipart/form-data",
                                       },
-                                    }
+                                    },
                                   );
                                   let url = response.data?.data?.url;
                                   if (url) {
                                     const base =
                                       api.defaults.baseURL?.replace(
                                         /\/api\/?$/,
-                                        ""
+                                        "",
                                       ) || "";
                                     url = url.startsWith("http")
                                       ? url
@@ -4315,7 +4321,7 @@ const Home = ({ isEditMode = false }) => {
                                   formData.append("file", f);
                                   formData.append(
                                     "tabela_referencia",
-                                    "cpsl_intro"
+                                    "cpsl_intro",
                                   );
                                   formData.append("id_referencia", 1);
                                   const response = await api.post(
@@ -4325,7 +4331,7 @@ const Home = ({ isEditMode = false }) => {
                                       headers: {
                                         "Content-Type": "multipart/form-data",
                                       },
-                                    }
+                                    },
                                   );
                                   let url = response.data?.data?.url;
                                   if (!url)
@@ -4333,7 +4339,7 @@ const Home = ({ isEditMode = false }) => {
                                   const base =
                                     api.defaults.baseURL?.replace(
                                       /\/api\/?$/,
-                                      ""
+                                      "",
                                     ) || "";
                                   url = url.startsWith("http")
                                     ? url
@@ -4746,7 +4752,7 @@ const Home = ({ isEditMode = false }) => {
                     .filter(
                       (m) =>
                         m.url !== selectedNews.imagem_destaque &&
-                        (!m.tipo || m.tipo.includes("imagem"))
+                        (!m.tipo || m.tipo.includes("imagem")),
                     )
                     .map((m) => (
                       <img
@@ -4757,7 +4763,7 @@ const Home = ({ isEditMode = false }) => {
                         onError={(e) => {
                           console.warn(
                             "Imagem adicional não encontrada:",
-                            e.target.src
+                            e.target.src,
                           );
                           e.target.src = PLACEHOLDER_SVG;
                         }}
@@ -4775,7 +4781,7 @@ const Home = ({ isEditMode = false }) => {
                 <small className="project-date">
                   📅{" "}
                   {new Date(
-                    selectedNews.data_publicacao || selectedNews.created_at
+                    selectedNews.data_publicacao || selectedNews.created_at,
                   ).toLocaleDateString("pt-PT")}
                 </small>
               </div>
@@ -5008,10 +5014,10 @@ const Home = ({ isEditMode = false }) => {
                 {editingSecaoPersonalizada
                   ? `Item - ${editingSecaoPersonalizada.titulo}`
                   : editingSection === "respostas-sociais"
-                  ? "Resposta Social"
-                  : editingSection === "noticias"
-                  ? "Notícia"
-                  : "Subseção Institucional"}
+                    ? "Resposta Social"
+                    : editingSection === "noticias"
+                      ? "Notícia"
+                      : "Subseção Institucional"}
               </h3>
               <button className="btn-close" onClick={closeAddModal}>
                 ✕
@@ -5079,8 +5085,8 @@ const Home = ({ isEditMode = false }) => {
                       editingSection === "respostas-sociais"
                         ? "Ex: ERPI, Creche, Centro de Dia..."
                         : editingSection === "noticias"
-                        ? "Título da notícia"
-                        : "Ex: Sobre Nós, Valores, Visão e Missão..."
+                          ? "Título da notícia"
+                          : "Ex: Sobre Nós, Valores, Visão e Missão..."
                     }
                   />
                 </label>
@@ -5113,8 +5119,8 @@ const Home = ({ isEditMode = false }) => {
                           editingSection === "noticias"
                             ? "Breve resumo da notícia"
                             : editingSection === "respostas-sociais"
-                            ? "Breve descrição da resposta social"
-                            : "Breve descrição"
+                              ? "Breve descrição da resposta social"
+                              : "Breve descrição"
                         }
                       />
                     </label>

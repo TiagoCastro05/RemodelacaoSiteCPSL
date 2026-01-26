@@ -1,3 +1,15 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+
+# Bloquear acesso a áreas administrativas
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /login
+
+# Bloquear ficheiros de sistema
+Disallow: /uploads/temp/
+Disallow: /*.json$
+
+# Sitemap
+Sitemap: https://cpsl.pt/sitemap.xml
