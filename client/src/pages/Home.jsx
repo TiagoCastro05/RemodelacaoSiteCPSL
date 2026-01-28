@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useRef,
+  useCallback,
+} from "react";
 import toast from "react-hot-toast";
 import Header from "../components/Header";
 import api from "../services/api";
@@ -382,21 +388,20 @@ const Home = ({ isEditMode = false }) => {
 
   const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
-  const normalizeMediaUrls = (media = []) => {
+  const normalizeMediaUrls = useCallback((media = []) => {
     const base = getBaseUrl();
     return media.map((m) => ({
       ...m,
       url: m.url && !m.url.startsWith("http") ? `${base}${m.url}` : m.url,
     }));
-  };
+  }, []);
 
   const getMediaTableForSection = (section) => {
     if (section === "noticias") return "noticias_eventos";
     if (section === "respostas-sociais") return "respostas_sociais";
     if (section === "institucional" || section === "instituicao")
       return "conteudo_institucional";
-    if (section === "secao-personalizada")
-      return "itens_secoes_personalizadas";
+    if (section === "secao-personalizada") return "itens_secoes_personalizadas";
     return null;
   };
 
@@ -431,21 +436,24 @@ const Home = ({ isEditMode = false }) => {
     });
   };
 
-  const fetchMediaForItem = async (tabelaRef, idReferencia) => {
-    if (!tabelaRef || !idReferencia) return [];
-    try {
-      const response = await api.get("/media", {
-        params: {
-          tabela_referencia: tabelaRef,
-          id_referencia: idReferencia,
-        },
-      });
-      return normalizeMediaUrls(response.data?.data || []);
-    } catch (error) {
-      console.error("Erro ao carregar media:", error);
-      return [];
-    }
-  };
+  const fetchMediaForItem = useCallback(
+    async (tabelaRef, idReferencia) => {
+      if (!tabelaRef || !idReferencia) return [];
+      try {
+        const response = await api.get("/media", {
+          params: {
+            tabela_referencia: tabelaRef,
+            id_referencia: idReferencia,
+          },
+        });
+        return normalizeMediaUrls(response.data?.data || []);
+      } catch (error) {
+        console.error("Erro ao carregar media:", error);
+        return [];
+      }
+    },
+    [normalizeMediaUrls],
+  );
 
   const loadExistingMediaForEdit = async (section, idReferencia) => {
     const tabelaRef = getMediaTableForSection(section);
@@ -911,7 +919,7 @@ const Home = ({ isEditMode = false }) => {
     };
 
     fetchContent();
-  }, []);
+  }, [fetchMediaForItem]);
 
   // Buscar respostas sociais
   useEffect(() => {
@@ -944,7 +952,7 @@ const Home = ({ isEditMode = false }) => {
     };
 
     fetchRespostas();
-  }, []);
+  }, [fetchMediaForItem]);
 
   // Buscar notícias
   useEffect(() => {
@@ -980,7 +988,7 @@ const Home = ({ isEditMode = false }) => {
     };
 
     fetchNoticias();
-  }, []);
+  }, [fetchMediaForItem]);
 
   // Buscar seções personalizadas
   useEffect(() => {
@@ -1031,7 +1039,7 @@ const Home = ({ isEditMode = false }) => {
     };
 
     fetchSecoesPersonalizadas();
-  }, []);
+  }, [fetchMediaForItem]);
 
   useEffect(() => {
     const defaults = {};
@@ -1205,7 +1213,7 @@ const Home = ({ isEditMode = false }) => {
 
   const handleTranspDelete = async (docId) => {
     const confirmed = window.confirm(
-      "Tem a certeza que deseja eliminar este documento?"
+      "Tem a certeza que deseja eliminar este documento?",
     );
     if (!confirmed) return;
 
@@ -1302,7 +1310,7 @@ const Home = ({ isEditMode = false }) => {
   // Eliminar subseção
   const handleDelete = async (id, section, secaoId = null) => {
     const confirmed = await confirmAction(
-      "Tem certeza que deseja eliminar este item?"
+      "Tem certeza que deseja eliminar este item?",
     );
     if (!confirmed) return;
     try {
@@ -1382,10 +1390,7 @@ const Home = ({ isEditMode = false }) => {
   const openInstitutional = async (item) => {
     lastFocusedRef.current = document.activeElement;
     try {
-      const media = await fetchMediaForItem(
-        "conteudo_institucional",
-        item.id,
-      );
+      const media = await fetchMediaForItem("conteudo_institucional", item.id);
       setSelectedInstitutional({ ...item, media });
     } catch (error) {
       console.error("Erro ao obter media institucional:", error);
@@ -1400,10 +1405,7 @@ const Home = ({ isEditMode = false }) => {
       if (resp.data && resp.data.success) {
         const base = getBaseUrl();
         const data = resp.data.data || {};
-        if (
-          data.imagem_destaque &&
-          !data.imagem_destaque.startsWith("http")
-        ) {
+        if (data.imagem_destaque && !data.imagem_destaque.startsWith("http")) {
           data.imagem_destaque = `${base}${data.imagem_destaque}`;
         }
         if (Array.isArray(data.media)) {
@@ -1828,9 +1830,7 @@ const Home = ({ isEditMode = false }) => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) =>
-                    !isEditMode &&
-                    e.key === "Enter" &&
-                    openResposta(resposta)
+                    !isEditMode && e.key === "Enter" && openResposta(resposta)
                   }
                 >
                   {resposta.imagem_destaque && (
@@ -2524,7 +2524,7 @@ const Home = ({ isEditMode = false }) => {
                       onClick={async () => {
                         if (
                           window.confirm(
-                            "Tem certeza que deseja remover o formulário desta secção?"
+                            "Tem certeza que deseja remover o formulário desta secção?",
                           )
                         ) {
                           try {
@@ -4865,7 +4865,10 @@ const Home = ({ isEditMode = false }) => {
                                       }));
                                     }
                                   } catch (err) {
-                                    console.error("Erro ao enviar imagem:", err);
+                                    console.error(
+                                      "Erro ao enviar imagem:",
+                                      err,
+                                    );
                                     alert("Erro ao enviar imagem.");
                                   }
                                 }
@@ -4983,7 +4986,9 @@ const Home = ({ isEditMode = false }) => {
                                     );
                                     let url = response.data?.data?.url;
                                     if (!url)
-                                      throw new Error("Upload não retornou URL");
+                                      throw new Error(
+                                        "Upload não retornou URL",
+                                      );
                                     const base =
                                       api.defaults.baseURL?.replace(
                                         /\/api\/?$/,
@@ -4997,7 +5002,10 @@ const Home = ({ isEditMode = false }) => {
                                       imagem_fundo: url,
                                     });
                                   } catch (err) {
-                                    console.error("Erro ao enviar imagem:", err);
+                                    console.error(
+                                      "Erro ao enviar imagem:",
+                                      err,
+                                    );
                                     alert("Erro ao enviar imagem.");
                                   }
                                 }
@@ -5774,40 +5782,40 @@ const Home = ({ isEditMode = false }) => {
                                 }}
                               />
                             </span>
-                          <small className="hint">
-                            Enviar imagem de capa (aparece antes do título)
-                          </small>
-                          {(editingSecaoPersonalizada
-                            ? editingData.imagem
-                            : editingData.imagem_destaque) && (
-                            <button
-                              type="button"
-                              className="btn-remove-image"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (editingSecaoPersonalizada) {
-                                  setEditingData({
-                                    ...editingData,
-                                    imagem: "",
-                                  });
-                                } else {
-                                  setEditingData({
-                                    ...editingData,
-                                    imagem_destaque: "",
-                                  });
-                                }
-                              }}
-                              title="Remover imagem"
-                            >
-                              Remover imagem
-                            </button>
-                          )}
+                            <small className="hint">
+                              Enviar imagem de capa (aparece antes do título)
+                            </small>
+                            {(editingSecaoPersonalizada
+                              ? editingData.imagem
+                              : editingData.imagem_destaque) && (
+                              <button
+                                type="button"
+                                className="btn-remove-image"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (editingSecaoPersonalizada) {
+                                    setEditingData({
+                                      ...editingData,
+                                      imagem: "",
+                                    });
+                                  } else {
+                                    setEditingData({
+                                      ...editingData,
+                                      imagem_destaque: "",
+                                    });
+                                  }
+                                }}
+                                title="Remover imagem"
+                              >
+                                Remover imagem
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </label>
-                  </div>
-                )}
+                      </label>
+                    </div>
+                  )}
                 {renderMediaPicker()}
 
                 <label>
