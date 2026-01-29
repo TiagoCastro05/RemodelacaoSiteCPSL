@@ -99,6 +99,41 @@
   transition: all 0.3s ease;
 }
 
+/* Botão Hamburger (escondido em desktop) */
+.admin-menu-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 30px;
+  height: 25px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 10;
+}
+
+.admin-menu-toggle span {
+  width: 30px;
+  height: 3px;
+  background: white;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.admin-menu-toggle.active span:nth-child(1) {
+  transform: rotate(45deg) translate(7px, 7px);
+}
+
+.admin-menu-toggle.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.admin-menu-toggle.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -7px);
+}
+
 .btn-logout-admin:hover {
   background: rgba(244, 67, 54, 1);
   transform: translateY(-2px);
@@ -419,15 +454,60 @@
 /* Responsivo */
 @media (max-width: 768px) {
   .admin-bar {
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
     gap: 10px;
-    padding: 12px;
+    padding: 10px;
+    flex-wrap: nowrap;
+    min-height: auto;
   }
 
-  .admin-bar-left,
+  .admin-bar-left {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* Mostrar botão hamburger em mobile */
+  .admin-menu-toggle {
+    display: flex;
+  }
+
+  /* Menu escondido por padrão em mobile */
   .admin-bar-right {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    flex-direction: column;
+    align-items: stretch;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    box-shadow: none;
+    z-index: 1999;
+  }
+
+  /* Menu aberto */
+  .admin-bar-right.mobile-open {
+    max-height: 500px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+  }
+
+  /* Botões dentro do menu mobile */
+  .admin-bar-right .btn-admin-action,
+  .admin-bar-right .btn-logout-admin {
     width: 100%;
+    text-align: center;
     justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .admin-bar-right .btn-admin-action:last-child,
+  .admin-bar-right .btn-logout-admin {
+    margin-bottom: 0;
   }
 
   .btn-admin-action {

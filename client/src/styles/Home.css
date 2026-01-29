@@ -1154,7 +1154,10 @@
 }
 
 .erpi-form .form-row.row-address-4 {
-  grid-template-columns: minmax(360px, 4fr) minmax(120px, 1fr) minmax(180px, 1.2fr) minmax(180px, 1.2fr);
+  grid-template-columns: minmax(360px, 4fr) minmax(120px, 1fr) minmax(
+      180px,
+      1.2fr
+    ) minmax(180px, 1.2fr);
 }
 
 .erpi-form .form-row.row-address-2 {
@@ -1238,7 +1241,10 @@
 }
 
 .creche-form .form-row.row-address-3 {
-  grid-template-columns: minmax(300px, 3fr) minmax(200px, 2fr) minmax(120px, 1fr);
+  grid-template-columns: minmax(300px, 3fr) minmax(200px, 2fr) minmax(
+      120px,
+      1fr
+    );
 }
 
 .creche-form .form-row.row-parent-work {
@@ -1246,7 +1252,10 @@
 }
 
 .creche-form .form-row.row-parent-address {
-  grid-template-columns: minmax(300px, 3fr) minmax(200px, 2fr) minmax(120px, 1fr);
+  grid-template-columns: minmax(300px, 3fr) minmax(200px, 2fr) minmax(
+      120px,
+      1fr
+    );
 }
 
 .creche-form .form-row.row-parent-contact {
@@ -1408,6 +1417,79 @@
 @media (max-width: 768px) {
   .contact-form .form-row {
     flex-direction: column;
+  }
+}
+
+/* Corrigir formulários de inscrição em mobile (ERPI, SAD, Creche, Centro de Dia) */
+@media (max-width: 480px) {
+  /* Forçar layout de coluna em todos os formulários de inscrição */
+  .erpi-form .form-row,
+  .creche-form .form-row,
+  .sad-form .form-row,
+  .centro-dia-form .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  /* Garantir que campos ocupam largura total */
+  .erpi-form .form-field,
+  .creche-form .form-field,
+  .sad-form .form-field,
+  .centro-dia-form .form-field {
+    width: 100%;
+    grid-column: auto !important;
+  }
+
+  /* Inputs, selects e textareas com largura total */
+  .input-with-icon {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .input-with-icon input,
+  .input-with-icon select,
+  .input-with-icon textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px !important;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px !important;
+  }
+
+  /* Labels com largura total */
+  .form-field label {
+    width: 100%;
+    display: block;
+  }
+
+  /* Seletor de formulário responsivo */
+  .form-selector {
+    padding: 12px;
+  }
+
+  .form-selector-options {
+    flex-direction: column;
+  }
+
+  .form-option-card {
+    width: 100%;
+  }
+
+  /* Botões do formulário */
+  .form-actions {
+    text-align: center;
+  }
+
+  .form-actions .btn-save {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px !important;
   }
 }
 

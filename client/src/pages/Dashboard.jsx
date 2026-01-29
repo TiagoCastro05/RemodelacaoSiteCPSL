@@ -18,6 +18,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadInscriptions, setUnreadInscriptions] = useState(0);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchUnread = async () => {
@@ -35,8 +36,8 @@ const Dashboard = () => {
         const endpoints = [
           "/forms/erpi?lido=false",
           "/forms/centro-de-dia?lido=false",
-              "/forms/sad?lido=false",
-              "/forms/creche?lido=false",
+          "/forms/sad?lido=false",
+          "/forms/creche?lido=false",
         ];
         for (const ep of endpoints) {
           const resp = await api.get(ep);
@@ -95,7 +96,18 @@ const Dashboard = () => {
             {user?.nome} ({user?.tipo})
           </span>
         </div>
-        <div className="admin-bar-right">
+        <button
+          className={`admin-menu-toggle ${isAdminMenuOpen ? "active" : ""}`}
+          onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)}
+          aria-label="Menu"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <div
+          className={`admin-bar-right ${isAdminMenuOpen ? "mobile-open" : ""}`}
+        >
           <button
             onClick={() => navigate("/dashboard/projetos")}
             className="btn-admin-action"
@@ -150,7 +162,7 @@ const Dashboard = () => {
         {/* Dashboard principal agora mostra o site público com edição inline */}
         <Route path="/" element={<Home isEditMode={true} />} />
         <Route path="/mensagens" element={<Messages />} />
-    <Route path="/inscricoes" element={<Inscriptions />} />
+        <Route path="/inscricoes" element={<Inscriptions />} />
         <Route path="/projetos" element={<ProjectsManagement />} />
         <Route path="/secoes" element={<CustomSectionsManagement />} />
         <Route
