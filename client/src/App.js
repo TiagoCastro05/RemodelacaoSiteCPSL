@@ -18,6 +18,9 @@ function App() {
     <Router>
       <AuthProvider>
         <AccessibilityProvider>
+          <a href="#conteudo" className="skip-link">
+            Saltar para conteúdo
+          </a>
           <Toaster
             position="top-right"
             toastOptions={{

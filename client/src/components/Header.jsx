@@ -131,13 +131,18 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
           className={`mobile-menu-toggle ${isMobileMenuOpen ? "active" : ""}`}
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-label="Menu"
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="main-navigation"
         >
           <span></span>
           <span></span>
           <span></span>
         </button>
 
-        <nav className={`main-nav ${isMobileMenuOpen ? "mobile-open" : ""}`}>
+        <nav
+          id="main-navigation"
+          className={`main-nav ${isMobileMenuOpen ? "mobile-open" : ""}`}
+        >
           <ul>
             {menuSections.map((section) => (
               <li key={section.id}>

@@ -367,6 +367,11 @@ const Home = ({ isEditMode = false }) => {
   const editModalRef = useRef(null);
   const addModalRef = useRef(null);
   const newsModalRef = useRef(null);
+  const transpModalRef = useRef(null);
+  const confirmModalRef = useRef(null);
+  const customItemModalRef = useRef(null);
+  const institutionalModalRef = useRef(null);
+  const respostaModalRef = useRef(null);
 
   const normalizeHeroConfig = (data = {}) => {
     const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
@@ -1426,6 +1431,38 @@ const Home = ({ isEditMode = false }) => {
     if (el) el.focus();
   };
 
+  const handleActionKeyDown = (event, action) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      action();
+    }
+  };
+
+  const handleModalKeyDown = (event, modalRef, onClose) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+    const modal = modalRef?.current;
+    if (!modal) return;
+    const focusables = modal.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   const confirmAction = (message) =>
     new Promise((resolve) => {
       setConfirmState({ open: true, message, resolve });
@@ -1455,6 +1492,36 @@ const Home = ({ isEditMode = false }) => {
       setTimeout(() => focusFirstElement(newsModalRef), 0);
     }
   }, [showNewsModal]);
+
+  useEffect(() => {
+    if (showTranspModal) {
+      setTimeout(() => focusFirstElement(transpModalRef), 0);
+    }
+  }, [showTranspModal]);
+
+  useEffect(() => {
+    if (confirmState.open) {
+      setTimeout(() => focusFirstElement(confirmModalRef), 0);
+    }
+  }, [confirmState.open]);
+
+  useEffect(() => {
+    if (showCustomItemModal) {
+      setTimeout(() => focusFirstElement(customItemModalRef), 0);
+    }
+  }, [showCustomItemModal]);
+
+  useEffect(() => {
+    if (selectedInstitutional) {
+      setTimeout(() => focusFirstElement(institutionalModalRef), 0);
+    }
+  }, [selectedInstitutional]);
+
+  useEffect(() => {
+    if (selectedResposta) {
+      setTimeout(() => focusFirstElement(respostaModalRef), 0);
+    }
+  }, [selectedResposta]);
 
   const closeEditModal = () => {
     setShowEditModal(false);
@@ -1582,41 +1649,42 @@ const Home = ({ isEditMode = false }) => {
         customSections={secoesPersonalizadas}
         isEditMode={isEditMode}
       />
-
-      <section
-        className="hero-section"
-        style={{
-          backgroundImage: heroConfig.imagem_fundo
-            ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${heroConfig.imagem_fundo})`
-            : undefined,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      >
-        <div className="container">
-          {isEditMode && user && (
-            <button
-              className="btn-edit-inline btn-edit-hero"
-              onClick={() =>
-                handleEdit("hero", {
-                  titulo: heroConfig.titulo,
-                  subtitulo: heroConfig.subtitulo,
-                  imagem_fundo: heroConfig.imagem_fundo,
-                })
-              }
-              title="Editar Hero"
-            >
-              ✏️
-            </button>
-          )}
-          <h1>{heroConfig.titulo}</h1>
-          <p>{heroConfig.subtitulo}</p>
-          <a href="#contactos" className="btn-primary">
-            Entre em Contacto
-          </a>
-        </div>
-      </section>
+      <main id="conteudo">
+        <section
+          className="hero-section"
+          style={{
+            backgroundImage: heroConfig.imagem_fundo
+              ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${heroConfig.imagem_fundo})`
+              : undefined,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
+          <div className="container">
+            {isEditMode && user && (
+              <button
+                className="btn-edit-inline btn-edit-hero"
+                onClick={() =>
+                  handleEdit("hero", {
+                    titulo: heroConfig.titulo,
+                    subtitulo: heroConfig.subtitulo,
+                    imagem_fundo: heroConfig.imagem_fundo,
+                  })
+                }
+                title="Editar Hero"
+                aria-label="Editar secção principal"
+              >
+                ✏️
+              </button>
+            )}
+            <h1>{heroConfig.titulo}</h1>
+            <p>{heroConfig.subtitulo}</p>
+            <a href="#contactos" className="btn-primary">
+              Entre em Contacto
+            </a>
+          </div>
+        </section>
 
       <section id="instituicao" className="section">
         <div className="container">
@@ -1652,8 +1720,8 @@ const Home = ({ isEditMode = false }) => {
                   tabIndex={0}
                   onKeyDown={(e) =>
                     !isEditMode &&
-                    e.key === "Enter" &&
-                    openInstitutional(content)
+                    !e.target.closest(".subsection-actions") &&
+                    handleActionKeyDown(e, () => openInstitutional(content))
                   }
                 >
                   {content.imagem && (
@@ -1749,6 +1817,19 @@ const Home = ({ isEditMode = false }) => {
                   style={{
                     cursor: project.url_externa ? "pointer" : "default",
                   }}
+                  role={project.url_externa ? "link" : undefined}
+                  tabIndex={project.url_externa ? 0 : undefined}
+                  aria-label={
+                    project.url_externa
+                      ? `Abrir projeto ${project.titulo} (nova janela)`
+                      : undefined
+                  }
+                  onKeyDown={(e) => {
+                    if (!project.url_externa) return;
+                    handleActionKeyDown(e, () =>
+                      window.open(project.url_externa, "_blank"),
+                    );
+                  }}
                 >
                   <div className="project-image-container">
                     {project.imagem_destaque ? (
@@ -1827,7 +1908,9 @@ const Home = ({ isEditMode = false }) => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) =>
-                    !isEditMode && e.key === "Enter" && openResposta(resposta)
+                    !isEditMode &&
+                    !e.target.closest(".subsection-actions") &&
+                    handleActionKeyDown(e, () => openResposta(resposta))
                   }
                 >
                   {resposta.imagem_destaque && (
@@ -1938,7 +2021,10 @@ const Home = ({ isEditMode = false }) => {
                   onClick={() => openNews(noticia)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && openNews(noticia)}
+                  onKeyDown={(e) =>
+                    !e.target.closest(".subsection-actions") &&
+                    handleActionKeyDown(e, () => openNews(noticia))
+                  }
                 >
                   {noticia.imagem_destaque && (
                     <img
@@ -2247,10 +2333,9 @@ const Home = ({ isEditMode = false }) => {
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (
-                          e.key === "Enter" &&
                           !e.target.closest(".subsection-actions")
                         ) {
-                          openCustomItem(item);
+                          handleActionKeyDown(e, () => openCustomItem(item));
                         }
                       }}
                     >
@@ -2325,10 +2410,9 @@ const Home = ({ isEditMode = false }) => {
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (
-                          e.key === "Enter" &&
                           !e.target.closest(".subsection-actions")
                         ) {
-                          openCustomItem(item);
+                          handleActionKeyDown(e, () => openCustomItem(item));
                         }
                       }}
                     >
@@ -2419,14 +2503,15 @@ const Home = ({ isEditMode = false }) => {
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (
-                          e.key === "Enter" &&
                           !e.target.closest(".subsection-actions")
                         ) {
-                          if (item.link_externo) {
-                            window.open(item.link_externo, "_blank");
-                          } else {
-                            openCustomItem(item);
-                          }
+                          handleActionKeyDown(e, () => {
+                            if (item.link_externo) {
+                              window.open(item.link_externo, "_blank");
+                            } else {
+                              openCustomItem(item);
+                            }
+                          });
                         }
                       }}
                     >
@@ -3144,48 +3229,53 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>A criança já nasceu? *</label>
-                            <div className="radio-group">
-                              <label>
-                                <input
-                                  type="radio"
-                                  name="crianca_nasceu"
-                                  value="sim"
-                                  onChange={() => {
-                                    setCrecheNasceuState((prev) => ({
-                                      ...prev,
-                                      [secao.id]: true,
-                                    }));
-                                  }}
-                                  required
-                                />
-                                Sim
-                              </label>
-                              <label>
-                                <input
-                                  type="radio"
-                                  name="crianca_nasceu"
-                                  value="nao"
-                                  onChange={() => {
-                                    setCrecheNasceuState((prev) => ({
-                                      ...prev,
-                                      [secao.id]: false,
-                                    }));
-                                  }}
-                                  required
-                                />
-                                Não
-                              </label>
-                            </div>
+                            <fieldset>
+                              <legend>A criança já nasceu? *</legend>
+                              <div className="radio-group">
+                                <label>
+                                  <input
+                                    type="radio"
+                                    name="crianca_nasceu"
+                                    value="sim"
+                                    onChange={() => {
+                                      setCrecheNasceuState((prev) => ({
+                                        ...prev,
+                                        [secao.id]: true,
+                                      }));
+                                    }}
+                                    required
+                                  />
+                                  Sim
+                                </label>
+                                <label>
+                                  <input
+                                    type="radio"
+                                    name="crianca_nasceu"
+                                    value="nao"
+                                    onChange={() => {
+                                      setCrecheNasceuState((prev) => ({
+                                        ...prev,
+                                        [secao.id]: false,
+                                      }));
+                                    }}
+                                    required
+                                  />
+                                  Não
+                                </label>
+                              </div>
+                            </fieldset>
                           </div>
                         </div>
 
                         <div className="form-row row-name-birth">
                           <div className="form-field name-field">
-                            <label>Nome completo da criança *</label>
+                            <label htmlFor={`creche-nome-${secao.id}`}>
+                              Nome completo da criança *
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">👶</span>
                               <input
+                                id={`creche-nome-${secao.id}`}
                                 name="nome_completo"
                                 required
                                 placeholder="Nome completo"
@@ -3193,7 +3283,7 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>
+                            <label htmlFor={`creche-data-${secao.id}`}>
                               {crecheNasceuState[secao.id]
                                 ? "Data de nascimento *"
                                 : "Data prevista *"}
@@ -3201,6 +3291,7 @@ const Home = ({ isEditMode = false }) => {
                             <div className="input-with-icon">
                               <span className="input-icon">📅</span>
                               <input
+                                id={`creche-data-${secao.id}`}
                                 type="date"
                                 name={
                                   crecheNasceuState[secao.id]
@@ -3221,10 +3312,13 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row row-address-3">
                           <div className="form-field">
-                            <label>Morada *</label>
+                            <label htmlFor={`creche-morada-${secao.id}`}>
+                              Morada *
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏠</span>
                               <input
+                                id={`creche-morada-${secao.id}`}
                                 name="morada"
                                 required
                                 placeholder="Rua, nº, andar"
@@ -3232,10 +3326,13 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Localidade *</label>
+                            <label htmlFor={`creche-localidade-${secao.id}`}>
+                              Localidade *
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏘️</span>
                               <input
+                                id={`creche-localidade-${secao.id}`}
                                 name="localidade"
                                 required
                                 placeholder="Localidade"
@@ -3243,10 +3340,13 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Código Postal *</label>
+                            <label htmlFor={`creche-cp-${secao.id}`}>
+                              Código Postal *
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏷️</span>
                               <input
+                                id={`creche-cp-${secao.id}`}
                                 name="codigo_postal"
                                 required
                                 placeholder="0000-000"
@@ -3259,34 +3359,52 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>CC/BI</label>
+                            <label htmlFor={`creche-cc-${secao.id}`}>
+                              CC/BI
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🪪</span>
                               <input
+                                id={`creche-cc-${secao.id}`}
                                 name="cc_bi_numero"
                                 placeholder="Número CC/BI"
                               />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>NIF</label>
+                            <label htmlFor={`creche-nif-${secao.id}`}>
+                              NIF
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
-                              <input name="nif" placeholder="NIF" />
+                              <input
+                                id={`creche-nif-${secao.id}`}
+                                name="nif"
+                                placeholder="NIF"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>NISS</label>
+                            <label htmlFor={`creche-niss-${secao.id}`}>
+                              NISS
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">#</span>
-                              <input name="niss" placeholder="NISS" />
+                              <input
+                                id={`creche-niss-${secao.id}`}
+                                name="niss"
+                                placeholder="NISS"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Nº Utente</label>
+                            <label htmlFor={`creche-utente-${secao.id}`}>
+                              Nº Utente
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">💳</span>
                               <input
+                                id={`creche-utente-${secao.id}`}
                                 name="numero_utente"
                                 placeholder="Número de utente"
                               />
@@ -3297,10 +3415,13 @@ const Home = ({ isEditMode = false }) => {
                         <h4>Filiação</h4>
                         <div className="form-row">
                           <div className="form-field">
-                            <label>Nome da Mãe</label>
+                            <label htmlFor={`creche-mae-nome-${secao.id}`}>
+                              Nome da Mãe
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">👩</span>
                               <input
+                                id={`creche-mae-nome-${secao.id}`}
                                 name="mae_nome"
                                 placeholder="Nome da mãe"
                               />
@@ -3309,20 +3430,26 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                         <div className="form-row row-parent-work">
                           <div className="form-field">
-                            <label>Profissão</label>
+                            <label htmlFor={`creche-mae-prof-${secao.id}`}>
+                              Profissão
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🧑‍💼</span>
                               <input
+                                id={`creche-mae-prof-${secao.id}`}
                                 name="mae_profissao"
                                 placeholder="Profissão"
                               />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Local de emprego</label>
+                            <label htmlFor={`creche-mae-emp-${secao.id}`}>
+                              Local de emprego
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏢</span>
                               <input
+                                id={`creche-mae-emp-${secao.id}`}
                                 name="mae_local_emprego"
                                 placeholder="Local de emprego"
                               />
@@ -3331,27 +3458,39 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                         <div className="form-row row-parent-address">
                           <div className="form-field">
-                            <label>Morada</label>
+                            <label htmlFor={`creche-mae-morada-${secao.id}`}>
+                              Morada
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏠</span>
-                              <input name="mae_morada" placeholder="Morada" />
+                              <input
+                                id={`creche-mae-morada-${secao.id}`}
+                                name="mae_morada"
+                                placeholder="Morada"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Localidade</label>
+                            <label htmlFor={`creche-mae-local-${secao.id}`}>
+                              Localidade
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏘️</span>
                               <input
+                                id={`creche-mae-local-${secao.id}`}
                                 name="mae_localidade"
                                 placeholder="Localidade"
                               />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Código Postal</label>
+                            <label htmlFor={`creche-mae-cp-${secao.id}`}>
+                              Código Postal
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏷️</span>
                               <input
+                                id={`creche-mae-cp-${secao.id}`}
                                 name="mae_codigo_postal"
                                 placeholder="0000-000"
                                 pattern={POSTAL_PATTERN}
@@ -3362,10 +3501,13 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                         <div className="form-row row-parent-contact">
                           <div className="form-field">
-                            <label>Email</label>
+                            <label htmlFor={`creche-mae-email-${secao.id}`}>
+                              Email
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">✉️</span>
                               <input
+                                id={`creche-mae-email-${secao.id}`}
                                 name="mae_email"
                                 type="email"
                                 placeholder="email@exemplo.pt"
@@ -3373,10 +3515,13 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Telemóvel</label>
+                            <label htmlFor={`creche-mae-tel-${secao.id}`}>
+                              Telemóvel
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">📱</span>
                               <input
+                                id={`creche-mae-tel-${secao.id}`}
                                 name="mae_telemovel"
                                 placeholder="Telemóvel"
                               />
@@ -3386,10 +3531,13 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>Nome do Pai</label>
+                            <label htmlFor={`creche-pai-nome-${secao.id}`}>
+                              Nome do Pai
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">👨</span>
                               <input
+                                id={`creche-pai-nome-${secao.id}`}
                                 name="pai_nome"
                                 placeholder="Nome do pai"
                               />
@@ -3398,20 +3546,26 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                         <div className="form-row row-parent-work">
                           <div className="form-field">
-                            <label>Profissão do pai</label>
+                            <label htmlFor={`creche-pai-prof-${secao.id}`}>
+                              Profissão do pai
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🧑‍💼</span>
                               <input
+                                id={`creche-pai-prof-${secao.id}`}
                                 name="pai_profissao"
                                 placeholder="Profissão"
                               />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Local de emprego do pai</label>
+                            <label htmlFor={`creche-pai-emp-${secao.id}`}>
+                              Local de emprego do pai
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏢</span>
                               <input
+                                id={`creche-pai-emp-${secao.id}`}
                                 name="pai_local_emprego"
                                 placeholder="Local de emprego"
                               />
@@ -3420,27 +3574,39 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                         <div className="form-row row-parent-address">
                           <div className="form-field">
-                            <label>Morada do pai</label>
+                            <label htmlFor={`creche-pai-morada-${secao.id}`}>
+                              Morada do pai
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏠</span>
-                              <input name="pai_morada" placeholder="Morada" />
+                              <input
+                                id={`creche-pai-morada-${secao.id}`}
+                                name="pai_morada"
+                                placeholder="Morada"
+                              />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Localidade</label>
+                            <label htmlFor={`creche-pai-local-${secao.id}`}>
+                              Localidade
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏘️</span>
                               <input
+                                id={`creche-pai-local-${secao.id}`}
                                 name="pai_localidade"
                                 placeholder="Localidade"
                               />
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Código Postal</label>
+                            <label htmlFor={`creche-pai-cp-${secao.id}`}>
+                              Código Postal
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">🏷️</span>
                               <input
+                                id={`creche-pai-cp-${secao.id}`}
                                 name="pai_codigo_postal"
                                 placeholder="0000-000"
                                 pattern={POSTAL_PATTERN}
@@ -3451,10 +3617,13 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                         <div className="form-row row-parent-contact">
                           <div className="form-field">
-                            <label>Email</label>
+                            <label htmlFor={`creche-pai-email-${secao.id}`}>
+                              Email
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">✉️</span>
                               <input
+                                id={`creche-pai-email-${secao.id}`}
                                 name="pai_email"
                                 type="email"
                                 placeholder="email@exemplo.pt"
@@ -3462,10 +3631,13 @@ const Home = ({ isEditMode = false }) => {
                             </div>
                           </div>
                           <div className="form-field">
-                            <label>Telemóvel</label>
+                            <label htmlFor={`creche-pai-tel-${secao.id}`}>
+                              Telemóvel
+                            </label>
                             <div className="input-with-icon">
                               <span className="input-icon">📱</span>
                               <input
+                                id={`creche-pai-tel-${secao.id}`}
                                 name="pai_telemovel"
                                 placeholder="Telemóvel"
                               />
@@ -3475,67 +3647,71 @@ const Home = ({ isEditMode = false }) => {
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>
-                              Irmãos a frequentar o estabelecimento?
-                            </label>
-                            <div className="radio-group">
-                              <label>
-                                <input
-                                  type="radio"
-                                  name="irmaos_frequentam"
-                                  value="sim"
-                                />{" "}
-                                Sim
-                              </label>
-                              <label>
-                                <input
-                                  type="radio"
-                                  name="irmaos_frequentam"
-                                  value="nao"
-                                  defaultChecked
-                                />{" "}
-                                Não
-                              </label>
-                            </div>
+                            <fieldset>
+                              <legend>
+                                Irmãos a frequentar o estabelecimento?
+                              </legend>
+                              <div className="radio-group">
+                                <label>
+                                  <input
+                                    type="radio"
+                                    name="irmaos_frequentam"
+                                    value="sim"
+                                  />{" "}
+                                  Sim
+                                </label>
+                                <label>
+                                  <input
+                                    type="radio"
+                                    name="irmaos_frequentam"
+                                    value="nao"
+                                    defaultChecked
+                                  />{" "}
+                                  Não
+                                </label>
+                              </div>
+                            </fieldset>
                           </div>
                         </div>
 
                         <div className="form-row">
                           <div className="form-field">
-                            <label>
-                              A criança necessita de apoio especial?
-                            </label>
-                            <div className="radio-group">
-                              <label>
-                                <input
-                                  type="radio"
-                                  name="necessita_apoio"
-                                  value="sim"
-                                  onChange={() => {
-                                    const wrap = document.getElementById(
-                                      `apoio-wrap-${secao.id}`,
-                                    );
-                                    if (wrap) wrap.style.display = "block";
-                                  }}
-                                />
-                                Sim
-                              </label>
-                              <label>
-                                <input
-                                  type="radio"
-                                  name="necessita_apoio"
-                                  value="nao"
-                                  defaultChecked
-                                  onChange={() => {
-                                    const wrap = document.getElementById(
-                                      `apoio-wrap-${secao.id}`,
-                                    );
-                                    if (wrap) wrap.style.display = "none";
-                                  }}
-                                />
-                                Não
-                              </label>
-                            </div>
+                            <fieldset>
+                              <legend>
+                                A criança necessita de apoio especial?
+                              </legend>
+                              <div className="radio-group">
+                                <label>
+                                  <input
+                                    type="radio"
+                                    name="necessita_apoio"
+                                    value="sim"
+                                    onChange={() => {
+                                      const wrap = document.getElementById(
+                                        `apoio-wrap-${secao.id}`,
+                                      );
+                                      if (wrap) wrap.style.display = "block";
+                                    }}
+                                  />
+                                  Sim
+                                </label>
+                                <label>
+                                  <input
+                                    type="radio"
+                                    name="necessita_apoio"
+                                    value="nao"
+                                    defaultChecked
+                                    onChange={() => {
+                                      const wrap = document.getElementById(
+                                        `apoio-wrap-${secao.id}`,
+                                      );
+                                      if (wrap) wrap.style.display = "none";
+                                    }}
+                                  />
+                                  Não
+                                </label>
+                              </div>
+                            </fieldset>
                           </div>
                         </div>
 
@@ -3544,8 +3720,11 @@ const Home = ({ isEditMode = false }) => {
                           style={{ display: "none" }}
                           className="form-field"
                         >
-                          <label>Se sim, especifique</label>
+                          <label htmlFor={`creche-apoio-${secao.id}`}>
+                            Se sim, especifique
+                          </label>
                           <textarea
+                            id={`creche-apoio-${secao.id}`}
                             name="apoio_especificacao"
                             rows="3"
                             placeholder="Descreva o apoio necessário"
@@ -4616,9 +4795,22 @@ const Home = ({ isEditMode = false }) => {
             setTranspEditingDoc(null);
           }}
         >
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="edit-modal"
+            onClick={(e) => e.stopPropagation()}
+            ref={transpModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transp-modal-title"
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, transpModalRef, () => {
+                setShowTranspModal(false);
+                setTranspEditingDoc(null);
+              })
+            }
+          >
             <div className="edit-modal-header">
-              <h3>
+              <h3 id="transp-modal-title">
                 {transpEditingDoc
                   ? "Editar documento de transparência"
                   : "Adicionar documento de transparência"}
@@ -4629,6 +4821,7 @@ const Home = ({ isEditMode = false }) => {
                   setShowTranspModal(false);
                   setTranspEditingDoc(null);
                 }}
+                aria-label="Fechar"
               >
                 ✕
               </button>
@@ -4748,9 +4941,20 @@ const Home = ({ isEditMode = false }) => {
           className="confirm-modal-overlay"
           onClick={() => handleConfirm(false)}
         >
-          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Confirmação</h3>
-            <p>{confirmState.message}</p>
+          <div
+            className="confirm-modal"
+            onClick={(e) => e.stopPropagation()}
+            ref={confirmModalRef}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-modal-title"
+            aria-describedby="confirm-modal-desc"
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, confirmModalRef, () => handleConfirm(false))
+            }
+          >
+            <h3 id="confirm-modal-title">Confirmação</h3>
+            <p id="confirm-modal-desc">{confirmState.message}</p>
             <div className="confirm-modal-actions">
               <button
                 type="button"
@@ -4771,6 +4975,8 @@ const Home = ({ isEditMode = false }) => {
         </div>
       )}
 
+      </main>
+
       <footer className="footer">
         <div className="container">
           <p>
@@ -4787,15 +4993,23 @@ const Home = ({ isEditMode = false }) => {
             className="edit-modal"
             onClick={(e) => e.stopPropagation()}
             ref={editModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-modal-title"
+            onKeyDown={(e) => handleModalKeyDown(e, editModalRef, closeEditModal)}
           >
             <div className="edit-modal-header">
-              <h3>
+              <h3 id="edit-modal-title">
                 Editar{" "}
                 {editingSection === "institucional"
                   ? "Instituição"
                   : editingSection}
               </h3>
-              <button className="btn-close" onClick={closeEditModal}>
+              <button
+                className="btn-close"
+                onClick={closeEditModal}
+                aria-label="Fechar"
+              >
                 ✕
               </button>
             </div>
@@ -5395,10 +5609,18 @@ const Home = ({ isEditMode = false }) => {
             className="edit-modal"
             onClick={(e) => e.stopPropagation()}
             ref={newsModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="news-modal-title"
+            onKeyDown={(e) => handleModalKeyDown(e, newsModalRef, closeNewsModal)}
           >
             <div className="edit-modal-header">
-              <h3>{selectedNews.titulo}</h3>
-              <button className="btn-close" onClick={closeNewsModal}>
+              <h3 id="news-modal-title">{selectedNews.titulo}</h3>
+              <button
+                className="btn-close"
+                onClick={closeNewsModal}
+                aria-label="Fechar"
+              >
                 ✕
               </button>
             </div>
@@ -5473,9 +5695,26 @@ const Home = ({ isEditMode = false }) => {
             }
           }}
         >
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="edit-modal"
+            onClick={(e) => e.stopPropagation()}
+            ref={customItemModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="custom-item-modal-title"
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, customItemModalRef, () => {
+                setShowCustomItemModal(false);
+                if (lastFocusedRef.current) {
+                  lastFocusedRef.current.focus();
+                }
+              })
+            }
+          >
             <div className="edit-modal-header">
-              <h3>{selectedCustomItem.titulo || "Detalhes"}</h3>
+              <h3 id="custom-item-modal-title">
+                {selectedCustomItem.titulo || "Detalhes"}
+              </h3>
               <button
                 className="btn-close"
                 onClick={() => {
@@ -5484,6 +5723,7 @@ const Home = ({ isEditMode = false }) => {
                     lastFocusedRef.current.focus();
                   }
                 }}
+                aria-label="Fechar"
               >
                 ✕
               </button>
@@ -5583,14 +5823,39 @@ const Home = ({ isEditMode = false }) => {
       {selectedInstitutional && (
         <div
           className="edit-modal-overlay"
-          onClick={() => setSelectedInstitutional(null)}
+          onClick={() => {
+            setSelectedInstitutional(null);
+            if (lastFocusedRef.current) {
+              lastFocusedRef.current.focus();
+            }
+          }}
         >
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="edit-modal"
+            onClick={(e) => e.stopPropagation()}
+            ref={institutionalModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="institutional-modal-title"
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, institutionalModalRef, () =>
+                setSelectedInstitutional(null),
+              )
+            }
+          >
             <div className="edit-modal-header">
-              <h3>{selectedInstitutional.titulo}</h3>
+              <h3 id="institutional-modal-title">
+                {selectedInstitutional.titulo}
+              </h3>
               <button
                 className="btn-close"
-                onClick={() => setSelectedInstitutional(null)}
+                onClick={() => {
+                  setSelectedInstitutional(null);
+                  if (lastFocusedRef.current) {
+                    lastFocusedRef.current.focus();
+                  }
+                }}
+                aria-label="Fechar"
               >
                 ✕
               </button>
@@ -5652,14 +5917,37 @@ const Home = ({ isEditMode = false }) => {
       {selectedResposta && (
         <div
           className="edit-modal-overlay"
-          onClick={() => setSelectedResposta(null)}
+          onClick={() => {
+            setSelectedResposta(null);
+            if (lastFocusedRef.current) {
+              lastFocusedRef.current.focus();
+            }
+          }}
         >
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="edit-modal"
+            onClick={(e) => e.stopPropagation()}
+            ref={respostaModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resposta-modal-title"
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, respostaModalRef, () =>
+                setSelectedResposta(null),
+              )
+            }
+          >
             <div className="edit-modal-header">
-              <h3>{selectedResposta.titulo}</h3>
+              <h3 id="resposta-modal-title">{selectedResposta.titulo}</h3>
               <button
                 className="btn-close"
-                onClick={() => setSelectedResposta(null)}
+                onClick={() => {
+                  setSelectedResposta(null);
+                  if (lastFocusedRef.current) {
+                    lastFocusedRef.current.focus();
+                  }
+                }}
+                aria-label="Fechar"
               >
                 ✕
               </button>
@@ -5715,9 +6003,13 @@ const Home = ({ isEditMode = false }) => {
             className="edit-modal"
             onClick={(e) => e.stopPropagation()}
             ref={addModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-modal-title"
+            onKeyDown={(e) => handleModalKeyDown(e, addModalRef, closeAddModal)}
           >
             <div className="edit-modal-header">
-              <h3>
+              <h3 id="add-modal-title">
                 Adicionar{" "}
                 {editingSecaoPersonalizada
                   ? `Item - ${editingSecaoPersonalizada.titulo}`
@@ -5727,7 +6019,11 @@ const Home = ({ isEditMode = false }) => {
                       ? "Notícia"
                       : "Subseção Institucional"}
               </h3>
-              <button className="btn-close" onClick={closeAddModal}>
+              <button
+                className="btn-close"
+                onClick={closeAddModal}
+                aria-label="Fechar"
+              >
                 ✕
               </button>
             </div>

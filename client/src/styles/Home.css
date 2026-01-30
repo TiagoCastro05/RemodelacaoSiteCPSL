@@ -1049,6 +1049,26 @@
   margin-bottom: 6px;
   color: #334155;
 }
+
+.contact-form fieldset,
+.creche-form fieldset,
+.centro-dia-form fieldset,
+.erpi-form fieldset,
+.sad-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.contact-form legend,
+.creche-form legend,
+.centro-dia-form legend,
+.erpi-form legend,
+.sad-form legend {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #334155;
+}
 .input-with-icon {
   display: flex;
   align-items: center;
