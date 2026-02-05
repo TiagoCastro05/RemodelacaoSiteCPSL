@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS respostas_sociais (
     subtitulo VARCHAR(300),
     descricao TEXT,
     conteudo TEXT,
+    destaques TEXT,
     objetivos TEXT,
     servicos_prestados TEXT,
     capacidade VARCHAR(100),

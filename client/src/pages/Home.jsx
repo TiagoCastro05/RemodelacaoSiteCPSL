@@ -39,6 +39,42 @@ const formatDate = (dateStr) => {
   }
 };
 
+const MAX_RESPOSTA_DESTAQUES = 3;
+
+const parseRespostaDestaques = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+};
+
+const normalizeRespostaDestaques = (value) =>
+  parseRespostaDestaques(value).map((item) => ({
+    titulo: item?.titulo ? String(item.titulo) : "",
+    texto: item?.texto ? String(item.texto) : "",
+  }));
+
+const buildRespostaDestaques = (value) =>
+  normalizeRespostaDestaques(value)
+    .map((item) => ({
+      titulo: item.titulo.trim(),
+      texto: item.texto.trim(),
+    }))
+    .filter((item) => item.titulo || item.texto)
+    .slice(0, MAX_RESPOSTA_DESTAQUES);
+
+const serializeRespostaDestaques = (value) => {
+  const cleaned = buildRespostaDestaques(value);
+  return cleaned.length ? JSON.stringify(cleaned) : null;
+};
+
 // Editor simples baseado em contentEditable (compatível com React 19+)
 function RichTextEditor({ value, onChange }) {
   const editorRef = useRef(null);
@@ -244,9 +280,9 @@ function RichTextEditor({ value, onChange }) {
 }
 
 // utilitário simples para remover tags HTML (usado para resumo)
-function stripHtml(html) {
+function stripHtml(html = "") {
   if (!html) return "";
-  return html.replace(/<[^>]*>/g, "");
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 // normalize initial HTML so we don't start with an outer strong/b tag which makes typing bold by default
@@ -303,16 +339,16 @@ const getFormConfig = (secao) => {
 
   const cfg = parseFormConfig(secao.config_formulario);
 
-  if (cfg?.tipo === "multiple") {
-    const opcoes = normalizeFormOptions(cfg.opcoes || []);
-    if (!opcoes.length) return null;
-    return {
-      tipo: "multiple",
-      opcoes,
-      titulo: cfg.titulo || "Escolha o formulário",
-      descricao: cfg.descricao || "",
-    };
-  }
+    if (cfg?.tipo === "multiple") {
+      const opcoes = normalizeFormOptions(cfg.opcoes || []);
+      if (!opcoes.length) return null;
+      return {
+        tipo: "multiple",
+        opcoes,
+        titulo: cfg.titulo || "",
+        descricao: cfg.descricao || "",
+      };
+    }
 
   const tipo = cfg?.tipo || (secao?.tem_formulario ? "contacto" : null);
   if (!tipo || tipo === "nenhum") return null;
@@ -745,6 +781,101 @@ const Home = ({ isEditMode = false }) => {
     );
   };
 
+  const addRespostaDestaque = () => {
+    setEditingData((prev) => {
+      const current = normalizeRespostaDestaques(prev?.destaques);
+      if (current.length >= MAX_RESPOSTA_DESTAQUES) return prev;
+      return {
+        ...prev,
+        destaques: [...current, { titulo: "", texto: "" }],
+      };
+    });
+  };
+
+  const updateRespostaDestaque = (index, field, value) => {
+    setEditingData((prev) => {
+      const current = normalizeRespostaDestaques(prev?.destaques);
+      const next = current.map((item, idx) =>
+        idx === index ? { ...item, [field]: value } : item,
+      );
+      return { ...prev, destaques: next };
+    });
+  };
+
+  const removeRespostaDestaque = (index) => {
+    setEditingData((prev) => {
+      const current = normalizeRespostaDestaques(prev?.destaques);
+      const next = current.filter((_, idx) => idx !== index);
+      return { ...prev, destaques: next };
+    });
+  };
+
+  const renderRespostaDestaquesEditor = () => {
+    if (editingSection !== "respostas-sociais") return null;
+    const destaques = normalizeRespostaDestaques(editingData?.destaques);
+    const canAdd = destaques.length < MAX_RESPOSTA_DESTAQUES;
+
+    return (
+      <div className="resposta-highlights-editor">
+        <div className="resposta-highlights-header">
+          <strong>Títulos e textos (até 3)</strong>
+          <button
+            type="button"
+            className="btn-add-highlight"
+            onClick={addRespostaDestaque}
+            disabled={!canAdd}
+          >
+            Adicionar título
+          </button>
+        </div>
+
+        {destaques.length === 0 && (
+          <small className="hint">
+            Adicione até 3 títulos com o respetivo texto.
+          </small>
+        )}
+
+        {destaques.map((item, idx) => (
+          <div key={`destaque-${idx}`} className="resposta-highlight-row">
+            <div className="resposta-highlight-fields">
+              <label>
+                <strong>Título:</strong>
+                <input
+                  type="text"
+                  value={item.titulo}
+                  onChange={(e) =>
+                    updateRespostaDestaque(idx, "titulo", e.target.value)
+                  }
+                  placeholder="Ex: Atendimento Diurno"
+                />
+              </label>
+              <label>
+                <strong>Texto:</strong>
+                <textarea
+                  rows="2"
+                  value={item.texto}
+                  onChange={(e) =>
+                    updateRespostaDestaque(idx, "texto", e.target.value)
+                  }
+                  placeholder="Texto abaixo do título"
+                />
+              </label>
+            </div>
+            <div className="resposta-highlight-actions">
+              <button
+                type="button"
+                className="btn-remove-highlight"
+                onClick={() => removeRespostaDestaque(idx)}
+              >
+                Remover
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   // Upload cover image (imagem_destaque) and set editingData.imagem_destaque
   const uploadCoverImage = async (file) => {
     try {
@@ -1068,7 +1199,14 @@ const Home = ({ isEditMode = false }) => {
     lastFocusedRef.current = document.activeElement;
     resetMediaState();
     setEditingSection(section);
-    setEditingData(data);
+    const normalizedData =
+      section === "respostas-sociais"
+        ? {
+            ...data,
+            destaques: normalizeRespostaDestaques(data?.destaques),
+          }
+        : data;
+    setEditingData(normalizedData);
     setEditingId(id);
     if (secaoPersonalizadaData) {
       setEditingSecaoPersonalizada(secaoPersonalizadaData);
@@ -1097,6 +1235,7 @@ const Home = ({ isEditMode = false }) => {
         titulo: "",
         descricao: "",
         conteudo: "",
+        destaques: [],
         imagem_destaque: "",
       });
     } else if (section === "noticias") {
@@ -1262,7 +1401,11 @@ const Home = ({ isEditMode = false }) => {
         }
         setEditingSecaoPersonalizada(null);
       } else if (editingSection === "respostas-sociais") {
-        response = await api.post("/respostas-sociais", editingData);
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
+        response = await api.post("/respostas-sociais", payload);
         if (response.data.success) {
           createdId = response.data.data?.id || null;
           setRespostasSociais([...respostasSociais, response.data.data]);
@@ -1592,7 +1735,11 @@ const Home = ({ isEditMode = false }) => {
         closeEditModal();
         alert("Conteúdo atualizado com sucesso!");
       } else if (editingSection === "respostas-sociais" && editingId) {
-        await api.put(`/respostas-sociais/${editingId}`, editingData);
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
+        await api.put(`/respostas-sociais/${editingId}`, payload);
         await uploadPendingMediaForItem(
           getMediaTableForSection(editingSection),
           editingId,
@@ -1600,7 +1747,7 @@ const Home = ({ isEditMode = false }) => {
         await refreshItemMedia("respostas-sociais", editingId);
         setRespostasSociais(
           respostasSociais.map((r) =>
-            r.id === editingId ? { ...r, ...editingData } : r,
+            r.id === editingId ? { ...r, ...payload } : r,
           ),
         );
         closeEditModal();
@@ -1956,27 +2103,53 @@ const Home = ({ isEditMode = false }) => {
                       </div>
                     )}
                   </div>
-                  {resposta.descricao && (
-                    <p
-                      className="content-summary"
-                      style={{ fontStyle: "italic", marginTop: 8 }}
-                    >
-                      {resposta.descricao}
-                    </p>
-                  )}
+                  {(() => {
+                    const destaques = buildRespostaDestaques(
+                      resposta?.destaques,
+                    );
+                    if (!destaques.length) return null;
+                    return (
+                      <div
+                        className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                      >
+                        {destaques.map((item, idx) => (
+                          <div
+                            key={`resposta-card-destaque-${idx}`}
+                            className="resposta-highlight"
+                          >
+                            {item.titulo && (
+                              <div className="resposta-highlight-title">
+                                {item.titulo}
+                              </div>
+                            )}
+                            {item.texto && (
+                              <div className="resposta-highlight-text">
+                                {item.texto}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {(() => {
+                    const hasConteudo = !!stripHtml(resposta.conteudo || "");
+                    if (resposta.descricao && hasConteudo) {
+                      return (
+                        <p
+                          className="content-summary"
+                          style={{ fontStyle: "italic", marginTop: 8 }}
+                        >
+                          {resposta.descricao}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div
                     className="content-preview"
                     dangerouslySetInnerHTML={{
-                      __html:
-                        (
-                          resposta.conteudo ||
-                          resposta.descricao ||
-                          ""
-                        ).substring(0, 200) +
-                        ((resposta.conteudo || resposta.descricao || "")
-                          .length > 200
-                          ? "..."
-                          : ""),
+                      __html: resposta.conteudo || resposta.descricao || "",
                     }}
                   />
                   <InlineGallery
@@ -2235,9 +2408,7 @@ const Home = ({ isEditMode = false }) => {
 
               {loadingSecoes ? (
                 <p>A carregar...</p>
-              ) : itens.length === 0 ? (
-                <p>Nenhum conteúdo adicionado ainda.</p>
-              ) : secao.tipo_layout === "texto" ? (
+              ) : itens.length === 0 ? null : secao.tipo_layout === "texto" ? (
                 /* Layout TEXTO - Mostra tudo expandido (como Valores) */
                 <div className="text-layout-content">
                   {itens.map((item) => (
@@ -2650,9 +2821,11 @@ const Home = ({ isEditMode = false }) => {
 
                   {isMultipleForm && formOptions.length > 1 && (
                     <div className="form-selector">
-                      <p className="form-selector-title">
-                        {formConfig.titulo || "Escolha o formulário"}
-                      </p>
+                      {formConfig.titulo?.trim() && (
+                        <p className="form-selector-title">
+                          {formConfig.titulo}
+                        </p>
+                      )}
                       {formConfig.descricao && (
                         <p className="form-selector-description">
                           {formConfig.descricao}
@@ -4788,15 +4961,9 @@ const Home = ({ isEditMode = false }) => {
       </section>
 
       {showTranspModal && (
-        <div
-          className="edit-modal-overlay"
-          onClick={() => {
-            setShowTranspModal(false);
-            setTranspEditingDoc(null);
-          }}
-        >
+        <div className="edit-modal-overlay">
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={transpModalRef}
             role="dialog"
@@ -4978,19 +5145,92 @@ const Home = ({ isEditMode = false }) => {
       </main>
 
       <footer className="footer">
-        <div className="container">
-          <p>
-            &copy; 2025 Centro Paroquial e Social de Lanheses. Todos os direitos
-            reservados.
-          </p>
+        <div className="footer-container">
+          <div className="footer-columns">
+            <div className="footer-col footer-brand">
+              <h3>Centro Paroquial e Social de Lanheses</h3>
+              <div className="footer-divider" />
+              <p>
+                O Centro Paroquial e Social de Lanheses (CPSL) é uma entidade
+                emergente e dinâmica que se adapta proativamente às necessidades
+                da comunidade. Com um foco primordial nas pessoas, a nossa
+                energia vital é alimentada pela atenção, afeto e empenho
+                incansável na promoção do bem-estar dos nossos utentes.
+              </p>
+            </div>
+            <div className="footer-col">
+              <h4>Contactos</h4>
+              <div className="footer-divider" />
+              <ul className="footer-list">
+                <li>Estrada da Igreja, nº 468 4925-416 Lanheses</li>
+                <li>
+                  Email:{" "}
+                  <a href="mailto:geral@cpslanheses.pt">
+                    geral@cpslanheses.pt
+                  </a>
+                </li>
+                <li>
+                  Telefone: <a href="tel:258739000">258 739 000</a>
+                  <span className="footer-note">
+                    {" "}
+                    (custo chamada para a rede fixa nacional)
+                  </span>
+                </li>
+              </ul>
+            </div>
+            <div className="footer-col">
+              <h4>As Nossas Redes</h4>
+              <div className="footer-divider" />
+              <div className="footer-social">
+                <a
+                  href="https://www.facebook.com/profile.php?id=61556284705683"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Facebook"
+                >
+                  <span aria-hidden="true">f</span>
+                </a>
+                <a
+                  href="https://www.instagram.com/cpslanheses/"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Instagram"
+                >
+                  <span aria-hidden="true">ig</span>
+                </a>
+                <a
+                  href="https://www.youtube.com/@CPSLanheses"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="YouTube"
+                >
+                  <span aria-hidden="true">yt</span>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <span>
+              &copy; {new Date().getFullYear()} Centro Paroquial e Social de
+              Lanheses. Todos os direitos reservados.
+            </span>
+            <a
+              className="footer-complaints"
+              href="https://www.livroreclamacoes.pt/INICIO/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Livro de Reclamações
+            </a>
+          </div>
         </div>
       </footer>
 
       {/* Modal de Edição Inline */}
       {showEditModal && (
-        <div className="edit-modal-overlay" onClick={closeEditModal}>
+        <div className="edit-modal-overlay">
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={editModalRef}
             role="dialog"
@@ -5401,6 +5641,8 @@ const Home = ({ isEditMode = false }) => {
                     />
                   </label>
 
+                  {renderRespostaDestaquesEditor()}
+
                   <div className="field">
                     <strong>Conteúdo:</strong>
                     <RichTextEditor
@@ -5606,7 +5848,7 @@ const Home = ({ isEditMode = false }) => {
       {showNewsModal && selectedNews && (
         <div className="edit-modal-overlay" onClick={closeNewsModal}>
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={newsModalRef}
             role="dialog"
@@ -5696,7 +5938,7 @@ const Home = ({ isEditMode = false }) => {
           }}
         >
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={customItemModalRef}
             role="dialog"
@@ -5831,7 +6073,7 @@ const Home = ({ isEditMode = false }) => {
           }}
         >
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={institutionalModalRef}
             role="dialog"
@@ -5925,7 +6167,7 @@ const Home = ({ isEditMode = false }) => {
           }}
         >
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={respostaModalRef}
             role="dialog"
@@ -5970,6 +6212,35 @@ const Home = ({ isEditMode = false }) => {
                   {selectedResposta.descricao}
                 </p>
               )}
+              {(() => {
+                const destaques = buildRespostaDestaques(
+                  selectedResposta?.destaques,
+                );
+                if (!destaques.length) return null;
+                return (
+                  <div
+                    className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                  >
+                    {destaques.map((item, idx) => (
+                      <div
+                        key={`resposta-destaque-${idx}`}
+                        className="resposta-highlight"
+                      >
+                        {item.titulo && (
+                          <div className="resposta-highlight-title">
+                            {item.titulo}
+                          </div>
+                        )}
+                        {item.texto && (
+                          <div className="resposta-highlight-text">
+                            {item.texto}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               <div
                 className="noticia-conteudo"
                 dangerouslySetInnerHTML={{
@@ -5998,9 +6269,9 @@ const Home = ({ isEditMode = false }) => {
 
       {/* Modal Adicionar Subseção */}
       {showAddModal && (
-        <div className="edit-modal-overlay" onClick={closeAddModal}>
+        <div className="edit-modal-overlay">
           <div
-            className="edit-modal"
+            className="edit-modal edit-modal--wide"
             onClick={(e) => e.stopPropagation()}
             ref={addModalRef}
             role="dialog"
@@ -6161,6 +6432,8 @@ const Home = ({ isEditMode = false }) => {
                       />
                     </label>
                   )}
+
+                {renderRespostaDestaquesEditor()}
 
                 {/* URL de Vídeo - apenas para seções personalizadas */}
                 {editingSecaoPersonalizada && (

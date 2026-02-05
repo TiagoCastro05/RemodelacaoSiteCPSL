@@ -52,6 +52,7 @@ CREATE TABLE Respostas_Sociais (
     titulo VARCHAR(200) NOT NULL,
     subtitulo VARCHAR(300),
     descricao TEXT NOT NULL,
+    destaques TEXT,
     objetivos TEXT,
     servicos_prestados TEXT,
     capacidade VARCHAR(100),

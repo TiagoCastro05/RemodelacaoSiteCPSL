@@ -544,3 +544,58 @@
     min-width: 800px;
   }
 }
+
+/* Opções de formulário nas secções personalizadas */
+.form-options-config {
+  margin-top: 12px;
+}
+
+.options-list {
+  margin-top: 12px;
+}
+
+.options-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.btn-add-option {
+  height: 44px;
+  padding: 10px 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.option-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.option-row select,
+.option-row input {
+  width: 100%;
+}
+
+/* Toast de confirmação (evita alert/confirm do browser) */
+.toast-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast-confirm p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.toast-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}

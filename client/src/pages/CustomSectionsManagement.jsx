@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { AuthContext } from "../contexts/AuthContext";
 import api from "../services/api";
 import "../styles/Dashboard.css";
@@ -45,7 +46,7 @@ function CustomSectionsManagement() {
     tem_formulario: false,
     tipo_formulario: "nenhum",
     formulario_opcoes: [],
-    formulario_titulo: "Escolha o formulário",
+    formulario_titulo: "",
     formulario_descricao: "",
   });
 
@@ -59,6 +60,40 @@ function CustomSectionsManagement() {
       return null;
     }
   };
+
+  const confirmAction = (message) =>
+    new Promise((resolve) => {
+      toast(
+        (t) => (
+          <div className="toast-confirm">
+            <p>{message}</p>
+            <div className="toast-confirm-actions">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  resolve(false);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  resolve(true);
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: Infinity },
+      );
+    });
 
   useEffect(() => {
     if (!user) {
@@ -77,7 +112,7 @@ function CustomSectionsManagement() {
       }
     } catch (error) {
       console.error("Erro ao carregar seções:", error);
-      alert("Erro ao carregar seções personalizadas.");
+      toast.error("Erro ao carregar seções personalizadas.");
     } finally {
       setLoading(false);
     }
@@ -105,7 +140,7 @@ function CustomSectionsManagement() {
           ? "multiple"
           : cfg?.tipo || (secao.tem_formulario ? "contacto" : "nenhum"),
         formulario_opcoes: optionsFromCfg,
-        formulario_titulo: cfg?.titulo || "Escolha o formulário",
+        formulario_titulo: cfg?.titulo || "",
         formulario_descricao: cfg?.descricao || "",
       });
     } else {
@@ -119,7 +154,7 @@ function CustomSectionsManagement() {
         tem_formulario: false,
         tipo_formulario: "nenhum",
         formulario_opcoes: [],
-        formulario_titulo: "Escolha o formulário",
+        formulario_titulo: "",
         formulario_descricao: "",
       });
     }
@@ -150,14 +185,14 @@ function CustomSectionsManagement() {
         }));
 
       if (opcoesLimpa.length === 0) {
-        alert("Adicione pelo menos uma opção de formulário.");
+        toast.error("Adicione pelo menos uma opção de formulário.");
         return;
       }
 
       config_formulario = {
         tipo: "multiple",
         opcoes: opcoesLimpa,
-        titulo: formulario_titulo?.trim() || "Escolha o formulário",
+        titulo: formulario_titulo?.trim() || "",
         descricao: formulario_descricao?.trim() || "",
       };
     } else if (tipo_formulario !== "nenhum") {
@@ -173,17 +208,17 @@ function CustomSectionsManagement() {
       if (editingSecao) {
         // Atualizar
         await api.put(`/secoes-personalizadas/${editingSecao.id}`, payload);
-        alert("Seção atualizada com sucesso!");
+        toast.success("Seção atualizada com sucesso!");
       } else {
         // Criar
         await api.post("/secoes-personalizadas", payload);
-        alert("Seção criada com sucesso!");
+        toast.success("Seção criada com sucesso!");
       }
       setShowModal(false);
       fetchSecoes();
     } catch (error) {
       console.error("Erro ao salvar seção:", error);
-      alert(error.response?.data?.message || "Erro ao salvar seção.");
+      toast.error(error.response?.data?.message || "Erro ao salvar seção.");
     }
   };
 
@@ -225,22 +260,23 @@ function CustomSectionsManagement() {
       fetchSecoes();
     } catch (error) {
       console.error("Erro ao reordenar:", error);
-      alert("Erro ao alterar ordem da seção.");
+      toast.error("Erro ao alterar ordem da seção.");
       setDraggedItem(null);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Tem certeza que deseja eliminar esta seção?")) {
-      return;
-    }
+    const confirmed = await confirmAction(
+      "Tem certeza que deseja eliminar esta seção?",
+    );
+    if (!confirmed) return;
     try {
       await api.delete(`/secoes-personalizadas/${id}`);
-      alert("Seção eliminada com sucesso!");
+      toast.success("Seção eliminada com sucesso!");
       fetchSecoes();
     } catch (error) {
       console.error("Erro ao eliminar seção:", error);
-      alert("Erro ao eliminar seção.");
+      toast.error("Erro ao eliminar seção.");
     }
   };
 
@@ -900,7 +936,7 @@ function CustomSectionsManagement() {
                         <strong>Opções de formulário</strong>
                         <button
                           type="button"
-                          className="btn-secondary"
+                          className="btn-secondary btn-add-option"
                           onClick={handleAddFormOption}
                         >
                           ➕ Adicionar opção
