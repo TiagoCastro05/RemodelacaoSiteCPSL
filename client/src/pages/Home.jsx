@@ -1041,7 +1041,7 @@ const Home = ({ isEditMode = false }) => {
 
   useEffect(() => {
     fetchTransparencia();
-  }, []);
+  }, [fetchTransparencia]);
 
   // Buscar conteúdo institucional
   const fetchConteudo = useCallback(async () => {
