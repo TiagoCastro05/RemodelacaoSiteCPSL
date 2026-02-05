@@ -7,7 +7,7 @@ const { authenticate, isAdminOrGestor } = require("../middleware/auth");
 router.get("/", async (req, res) => {
   try {
     const [secoes] = await pool.query(
-      "SELECT * FROM secoes_personalizadas WHERE ativo = true ORDER BY ordem ASC"
+      "SELECT * FROM secoes_personalizadas WHERE ativo = true ORDER BY ordem ASC",
     );
     res.json({ success: true, data: secoes });
   } catch (error) {
@@ -21,7 +21,7 @@ router.get("/:id", async (req, res) => {
   try {
     const [secoes] = await pool.query(
       "SELECT * FROM secoes_personalizadas WHERE id = $1",
-      [req.params.id]
+      [req.params.id],
     );
 
     if (secoes.length === 0) {
@@ -43,7 +43,7 @@ router.get("/:id/itens", async (req, res) => {
   try {
     const [itens] = await pool.query(
       "SELECT * FROM itens_secoes_personalizadas WHERE secao_id = $1 AND ativo = true ORDER BY ordem ASC",
-      [req.params.id]
+      [req.params.id],
     );
 
     res.json({ success: true, data: itens });
@@ -79,7 +79,7 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
     let ordemFinal = ordem;
     if (ordemFinal === undefined) {
       const [maxOrdem] = await pool.query(
-        "SELECT COALESCE(MAX(ordem), 0) as max_ordem FROM secoes_personalizadas"
+        "SELECT COALESCE(MAX(ordem), 0) as max_ordem FROM secoes_personalizadas",
       );
       ordemFinal = (maxOrdem[0]?.max_ordem || 0) + 1;
     }
@@ -100,7 +100,7 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
         tem_formulario || false,
         config_formulario ? JSON.stringify(config_formulario) : null,
         req.user.id,
-      ]
+      ],
     );
 
     res.status(201).json({
@@ -132,6 +132,7 @@ router.post("/:id/itens", [authenticate, isAdminOrGestor], async (req, res) => {
       imagem,
       video_url,
       link_externo,
+      destaques,
       ordem,
     } = req.body;
 
@@ -140,15 +141,15 @@ router.post("/:id/itens", [authenticate, isAdminOrGestor], async (req, res) => {
     if (ordemFinal === undefined) {
       const [maxOrdem] = await pool.query(
         "SELECT COALESCE(MAX(ordem), 0) as max_ordem FROM itens_secoes_personalizadas WHERE secao_id = $1",
-        [secaoId]
+        [secaoId],
       );
       ordemFinal = (maxOrdem[0]?.max_ordem || 0) + 1;
     }
 
     const [result] = await pool.query(
       `INSERT INTO itens_secoes_personalizadas 
-        (secao_id, titulo, subtitulo, conteudo, imagem, video_url, link_externo, ordem, ativo, criado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9) 
+        (secao_id, titulo, subtitulo, conteudo, imagem, video_url, link_externo, destaques, ordem, ativo, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10) 
        RETURNING *`,
       [
         secaoId,
@@ -158,9 +159,10 @@ router.post("/:id/itens", [authenticate, isAdminOrGestor], async (req, res) => {
         imagem || null,
         video_url || null,
         link_externo || null,
+        destaques || null,
         ordemFinal,
         req.user.id,
-      ]
+      ],
     );
 
     res.status(201).json({
@@ -217,9 +219,9 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
 
     await pool.query(
       `UPDATE secoes_personalizadas SET ${updates.join(
-        ", "
+        ", ",
       )} WHERE id = $${paramIndex}`,
-      values
+      values,
     );
 
     res.json({ success: true, message: "Seção atualizada com sucesso." });
@@ -242,6 +244,7 @@ router.put(
         "imagem",
         "video_url",
         "link_externo",
+        "destaques",
         "ordem",
         "ativo",
       ];
@@ -268,9 +271,9 @@ router.put(
 
       await pool.query(
         `UPDATE itens_secoes_personalizadas SET ${updates.join(
-          ", "
+          ", ",
         )} WHERE id = $${paramIndex}`,
-        values
+        values,
       );
 
       res.json({ success: true, message: "Item atualizado com sucesso." });
@@ -278,7 +281,7 @@ router.put(
       console.error("Erro ao atualizar item:", error);
       res.status(500).json({ success: false, message: "Erro no servidor." });
     }
-  }
+  },
 );
 
 // DELETE - Eliminar seção (soft delete)
@@ -286,7 +289,7 @@ router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
     await pool.query(
       "UPDATE secoes_personalizadas SET ativo = false WHERE id = $1",
-      [req.params.id]
+      [req.params.id],
     );
     res.json({ success: true, message: "Seção eliminada com sucesso." });
   } catch (error) {
@@ -303,14 +306,14 @@ router.delete(
     try {
       await pool.query(
         "UPDATE itens_secoes_personalizadas SET ativo = false WHERE id = $1",
-        [req.params.itemId]
+        [req.params.itemId],
       );
       res.json({ success: true, message: "Item eliminado com sucesso." });
     } catch (error) {
       console.error("Erro ao eliminar item:", error);
       res.status(500).json({ success: false, message: "Erro no servidor." });
     }
-  }
+  },
 );
 
 module.exports = router;

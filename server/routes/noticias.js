@@ -53,7 +53,7 @@ router.get("/:id", async (req, res) => {
   try {
     const [noticias] = await pool.query(
       "SELECT * FROM noticias_eventos WHERE id = $1",
-      [req.params.id]
+      [req.params.id],
     );
 
     if (noticias.length === 0) {
@@ -64,12 +64,16 @@ router.get("/:id", async (req, res) => {
 
     const [media] = await pool.query(
       "SELECT * FROM media WHERE tabela_referencia = $1 AND id_referencia = $2 ORDER BY ordem ASC",
-      ["noticias_eventos", req.params.id]
+      ["noticias_eventos", req.params.id],
     );
 
     // If imagem_destaque is not set, use first media.url as fallback
     const noticia = { ...noticias[0] };
-    if ((!noticia.imagem_destaque || noticia.imagem_destaque === "") && Array.isArray(media) && media.length > 0) {
+    if (
+      (!noticia.imagem_destaque || noticia.imagem_destaque === "") &&
+      Array.isArray(media) &&
+      media.length > 0
+    ) {
       noticia.imagem_destaque = media[0].url;
     }
 
@@ -83,12 +87,19 @@ router.get("/:id", async (req, res) => {
 // POST - Criar notícia
 router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
-    const { titulo, resumo, conteudo, tipo, imagem_destaque, publicado } =
-      req.body;
+    const {
+      titulo,
+      resumo,
+      conteudo,
+      tipo,
+      imagem_destaque,
+      publicado,
+      destaques,
+    } = req.body;
 
     const [result] = await pool.query(
-      `INSERT INTO noticias_eventos (titulo, resumo, conteudo, tipo, autor, imagem_destaque, publicado, data_publicacao, criado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO noticias_eventos (titulo, resumo, conteudo, tipo, autor, imagem_destaque, destaques, publicado, data_publicacao, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         titulo,
         resumo,
@@ -96,10 +107,11 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
         tipo,
         req.user.nome,
         imagem_destaque || null,
+        destaques || null,
         publicado ?? false,
         publicado ? new Date() : null,
         req.user.id,
-      ]
+      ],
     );
 
     res.status(201).json({
@@ -116,8 +128,15 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
 // PUT - Atualizar notícia
 router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
-    const { titulo, resumo, conteudo, tipo, imagem_destaque, publicado } =
-      req.body;
+    const {
+      titulo,
+      resumo,
+      conteudo,
+      tipo,
+      imagem_destaque,
+      publicado,
+      destaques,
+    } = req.body;
 
     const updates = [];
     const values = [];
@@ -143,6 +162,10 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       updates.push(`imagem_destaque = $${paramIndex++}`);
       values.push(imagem_destaque);
     }
+    if (destaques !== undefined) {
+      updates.push(`destaques = $${paramIndex++}`);
+      values.push(destaques);
+    }
     if (typeof publicado !== "undefined") {
       updates.push(`publicado = $${paramIndex++}`);
       values.push(publicado);
@@ -161,9 +184,9 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     values.push(req.params.id);
     await pool.query(
       `UPDATE noticias_eventos SET ${updates.join(
-        ", "
+        ", ",
       )} WHERE id = $${paramIndex}`,
-      values
+      values,
     );
 
     res.json({ success: true, message: "Notícia atualizada com sucesso." });
@@ -178,7 +201,7 @@ router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
     await pool.query(
       "DELETE FROM media WHERE tabela_referencia = $1 AND id_referencia = $2",
-      ["noticias_eventos", req.params.id]
+      ["noticias_eventos", req.params.id],
     );
     await pool.query("DELETE FROM noticias_eventos WHERE id = $1", [
       req.params.id,

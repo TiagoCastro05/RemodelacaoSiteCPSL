@@ -282,7 +282,10 @@ function RichTextEditor({ value, onChange }) {
 // utilitário simples para remover tags HTML (usado para resumo)
 function stripHtml(html = "") {
   if (!html) return "";
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // normalize initial HTML so we don't start with an outer strong/b tag which makes typing bold by default
@@ -339,16 +342,16 @@ const getFormConfig = (secao) => {
 
   const cfg = parseFormConfig(secao.config_formulario);
 
-    if (cfg?.tipo === "multiple") {
-      const opcoes = normalizeFormOptions(cfg.opcoes || []);
-      if (!opcoes.length) return null;
-      return {
-        tipo: "multiple",
-        opcoes,
-        titulo: cfg.titulo || "",
-        descricao: cfg.descricao || "",
-      };
-    }
+  if (cfg?.tipo === "multiple") {
+    const opcoes = normalizeFormOptions(cfg.opcoes || []);
+    if (!opcoes.length) return null;
+    return {
+      tipo: "multiple",
+      opcoes,
+      titulo: cfg.titulo || "",
+      descricao: cfg.descricao || "",
+    };
+  }
 
   const tipo = cfg?.tipo || (secao?.tem_formulario ? "contacto" : null);
   if (!tipo || tipo === "nenhum") return null;
@@ -811,27 +814,34 @@ const Home = ({ isEditMode = false }) => {
   };
 
   const renderRespostaDestaquesEditor = () => {
-    if (editingSection !== "respostas-sociais") return null;
+    // Agora funciona para respostas-sociais, noticias, conteudo institucional e secoes personalizadas
+    const isAllowed =
+      editingSection === "respostas-sociais" ||
+      editingSection === "noticias" ||
+      editingSection === "instituicao" ||
+      editingSecaoPersonalizada;
+    if (!isAllowed) return null;
+
     const destaques = normalizeRespostaDestaques(editingData?.destaques);
     const canAdd = destaques.length < MAX_RESPOSTA_DESTAQUES;
 
     return (
       <div className="resposta-highlights-editor">
         <div className="resposta-highlights-header">
-          <strong>Títulos e textos (até 3)</strong>
+          <strong>Subtítulos (até 3)</strong>
           <button
             type="button"
             className="btn-add-highlight"
             onClick={addRespostaDestaque}
             disabled={!canAdd}
           >
-            Adicionar título
+            Adicionar subtítulo
           </button>
         </div>
 
         {destaques.length === 0 && (
           <small className="hint">
-            Adicione até 3 títulos com o respetivo texto.
+            Adicione até 3 subtítulos com o respetivo texto.
           </small>
         )}
 
@@ -839,7 +849,7 @@ const Home = ({ isEditMode = false }) => {
           <div key={`destaque-${idx}`} className="resposta-highlight-row">
             <div className="resposta-highlight-fields">
               <label>
-                <strong>Título:</strong>
+                <strong>Subtítulo {idx + 1}:</strong>
                 <input
                   type="text"
                   value={item.titulo}
@@ -857,7 +867,7 @@ const Home = ({ isEditMode = false }) => {
                   onChange={(e) =>
                     updateRespostaDestaque(idx, "texto", e.target.value)
                   }
-                  placeholder="Texto abaixo do título"
+                  placeholder="Texto abaixo do subtítulo"
                 />
               </label>
             </div>
@@ -1200,7 +1210,10 @@ const Home = ({ isEditMode = false }) => {
     resetMediaState();
     setEditingSection(section);
     const normalizedData =
-      section === "respostas-sociais"
+      section === "respostas-sociais" ||
+      section === "noticias" ||
+      section === "instituicao" ||
+      section === "secao-personalizada"
         ? {
             ...data,
             destaques: normalizeRespostaDestaques(data?.destaques),
@@ -1229,7 +1242,13 @@ const Home = ({ isEditMode = false }) => {
 
     if (secaoPersonalizadaData) {
       setEditingSecaoPersonalizada(secaoPersonalizadaData);
-      setEditingData({ titulo: "", subtitulo: "", conteudo: "", imagem: "" });
+      setEditingData({
+        titulo: "",
+        subtitulo: "",
+        conteudo: "",
+        imagem: "",
+        destaques: [],
+      });
     } else if (section === "respostas-sociais") {
       setEditingData({
         titulo: "",
@@ -1245,6 +1264,7 @@ const Home = ({ isEditMode = false }) => {
         conteudo: "",
         tipo: "noticia",
         imagem_destaque: "",
+        destaques: [],
       });
     } else {
       setEditingData({
@@ -1252,6 +1272,7 @@ const Home = ({ isEditMode = false }) => {
         resumo: "",
         conteudo: "",
         imagem_destaque: "",
+        destaques: [],
       });
     }
     setEditingId(null);
@@ -1382,9 +1403,13 @@ const Home = ({ isEditMode = false }) => {
 
       if (editingSecaoPersonalizada) {
         // Criar item de seção personalizada
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
         response = await api.post(
           `/secoes-personalizadas/${editingSecaoPersonalizada.id}/itens`,
-          editingData,
+          payload,
         );
         if (response.data.success) {
           createdId = response.data.data?.id || null;
@@ -1411,17 +1436,23 @@ const Home = ({ isEditMode = false }) => {
           setRespostasSociais([...respostasSociais, response.data.data]);
         }
       } else if (editingSection === "noticias") {
-        response = await api.post("/noticias", {
+        const payload = {
           ...editingData,
           publicado: true,
-        });
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
+        response = await api.post("/noticias", payload);
         if (response.data.success) {
           createdId = response.data.data?.id || null;
           setNoticias([...noticias, response.data.data]);
         }
       } else {
         console.log("Enviando para /conteudo:", editingData);
-        response = await api.post("/conteudo", editingData);
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
+        response = await api.post("/conteudo", payload);
         console.log("Resposta de /conteudo:", response.data);
         if (response.data.success) {
           createdId = response.data.data?.id || null;
@@ -1697,9 +1728,13 @@ const Home = ({ isEditMode = false }) => {
         editingId &&
         editingSecaoPersonalizada
       ) {
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
         await api.put(
           `/secoes-personalizadas/${editingSecaoPersonalizada.id}/itens/${editingId}`,
-          editingData,
+          payload,
         );
         await uploadPendingMediaForItem(
           getMediaTableForSection("secao-personalizada"),
@@ -1715,13 +1750,17 @@ const Home = ({ isEditMode = false }) => {
           [editingSecaoPersonalizada.id]: (
             itensSecoesPersonalizadas[editingSecaoPersonalizada.id] || []
           ).map((item) =>
-            item.id === editingId ? { ...item, ...editingData } : item,
+            item.id === editingId ? { ...item, ...payload } : item,
           ),
         });
         closeEditModal();
         alert("Item atualizado com sucesso!");
       } else if (editingSection === "institucional" && editingId) {
-        await api.put(`/conteudo/${editingId}`, editingData);
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
+        await api.put(`/conteudo/${editingId}`, payload);
         await uploadPendingMediaForItem(
           getMediaTableForSection(editingSection),
           editingId,
@@ -1729,7 +1768,7 @@ const Home = ({ isEditMode = false }) => {
         await refreshItemMedia("institucional", editingId);
         setConteudoInstitucional(
           conteudoInstitucional.map((c) =>
-            c.id === editingId ? { ...c, ...editingData } : c,
+            c.id === editingId ? { ...c, ...payload } : c,
           ),
         );
         closeEditModal();
@@ -1753,16 +1792,18 @@ const Home = ({ isEditMode = false }) => {
         closeEditModal();
         alert("Resposta Social atualizada com sucesso!");
       } else if (editingSection === "noticias" && editingId) {
-        await api.put(`/noticias/${editingId}`, editingData);
+        const payload = {
+          ...editingData,
+          destaques: serializeRespostaDestaques(editingData?.destaques),
+        };
+        await api.put(`/noticias/${editingId}`, payload);
         await uploadPendingMediaForItem(
           getMediaTableForSection(editingSection),
           editingId,
         );
         await refreshItemMedia("noticias", editingId);
         setNoticias(
-          noticias.map((n) =>
-            n.id === editingId ? { ...n, ...editingData } : n,
-          ),
+          noticias.map((n) => (n.id === editingId ? { ...n, ...payload } : n)),
         );
         closeEditModal();
         alert("Notícia atualizada com sucesso!");
@@ -1833,600 +1874,64 @@ const Home = ({ isEditMode = false }) => {
           </div>
         </section>
 
-      <section id="instituicao" className="section">
-        <div className="container">
-          <div className="section-header-editable">
-            <h2>Instituição</h2>
-            {isEditMode && user && (
-              <button
-                className="btn-add-subsection"
-                onClick={handleAddSubsection}
-                title="Adicionar subseção"
-              >
-                ➕ Adicionar
-              </button>
-            )}
-          </div>
-
-          {loadingContent ? (
-            <p>A carregar conteúdo...</p>
-          ) : conteudoInstitucional.length === 0 ? (
-            <p>
-              Somos uma Instituição Particular de Solidariedade Social (IPSS)
-              reconhecida pelo seu espírito inovador.
-            </p>
-          ) : (
-            <div className="institutional-content">
-              {conteudoInstitucional.map((content) => (
-                <div
-                  key={content.id}
-                  className="content-subsection"
-                  onClick={() => !isEditMode && openInstitutional(content)}
-                  style={{ cursor: !isEditMode ? "pointer" : "default" }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) =>
-                    !isEditMode &&
-                    !e.target.closest(".subsection-actions") &&
-                    handleActionKeyDown(e, () => openInstitutional(content))
-                  }
+        <section id="instituicao" className="section">
+          <div className="container">
+            <div className="section-header-editable">
+              <h2>Instituição</h2>
+              {isEditMode && user && (
+                <button
+                  className="btn-add-subsection"
+                  onClick={handleAddSubsection}
+                  title="Adicionar subseção"
                 >
-                  {content.imagem && (
-                    <img
-                      src={content.imagem}
-                      alt={content.titulo}
-                      className="content-image"
-                      style={{ marginBottom: "1rem", maxWidth: "100%" }}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = PLACEHOLDER_SVG;
-                      }}
-                    />
-                  )}
-                  <div className="subsection-header">
-                    <h3>{content.titulo}</h3>
-                    {isEditMode && user && (
-                      <div className="subsection-actions">
-                        <button
-                          className="btn-edit-inline"
-                          onClick={() =>
-                            handleEdit("institucional", content, content.id)
-                          }
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-delete-inline"
-                          onClick={() =>
-                            handleDelete(content.id, "institucional")
-                          }
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {content.subtitulo && (
-                    <p
-                      className="content-summary"
-                      style={{ fontStyle: "italic", marginTop: 8 }}
-                    >
-                      {content.subtitulo}
-                    </p>
-                  )}
-                  <div
-                    className="content-preview"
-                    dangerouslySetInnerHTML={{ __html: content.conteudo || "" }}
-                  />
-                  <InlineGallery
-                    images={buildGalleryImages(
-                      content.imagem,
-                      content.media || [],
-                    )}
-                    altPrefix={content.titulo || "Imagem"}
-                  />
-                  {content.video_url && (
-                    <video controls className="content-video">
-                      <source src={content.video_url} type="video/mp4" />
-                    </video>
-                  )}
-                </div>
-              ))}
+                  ➕ Adicionar
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      </section>
 
-      <section id="projetos" className="section">
-        <div className="container">
-          <h2>Projetos</h2>
-
-          {loadingProjects ? (
-            <div className="loading-projects">A carregar projetos...</div>
-          ) : projects.length === 0 ? (
-            <p className="no-projects">Nenhum projeto disponível no momento.</p>
-          ) : (
-            <div className="projects-list">
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  className={`project-item ${
-                    project.url_externa ? "clickable" : ""
-                  }`}
-                  onClick={() => {
-                    if (project.url_externa) {
-                      window.open(project.url_externa, "_blank");
+            {loadingContent ? (
+              <p>A carregar conteúdo...</p>
+            ) : conteudoInstitucional.length === 0 ? (
+              <p>
+                Somos uma Instituição Particular de Solidariedade Social (IPSS)
+                reconhecida pelo seu espírito inovador.
+              </p>
+            ) : (
+              <div className="institutional-content">
+                {conteudoInstitucional.map((content) => (
+                  <div
+                    key={content.id}
+                    className="content-subsection"
+                    onClick={() => !isEditMode && openInstitutional(content)}
+                    style={{ cursor: !isEditMode ? "pointer" : "default" }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      !isEditMode &&
+                      !e.target.closest(".subsection-actions") &&
+                      handleActionKeyDown(e, () => openInstitutional(content))
                     }
-                  }}
-                  style={{
-                    cursor: project.url_externa ? "pointer" : "default",
-                  }}
-                  role={project.url_externa ? "link" : undefined}
-                  tabIndex={project.url_externa ? 0 : undefined}
-                  aria-label={
-                    project.url_externa
-                      ? `Abrir projeto ${project.titulo} (nova janela)`
-                      : undefined
-                  }
-                  onKeyDown={(e) => {
-                    if (!project.url_externa) return;
-                    handleActionKeyDown(e, () =>
-                      window.open(project.url_externa, "_blank"),
-                    );
-                  }}
-                >
-                  <div className="project-image-container">
-                    {project.imagem_destaque ? (
+                  >
+                    {content.imagem && (
                       <img
-                        src={project.imagem_destaque}
-                        alt={project.titulo}
-                        className="project-image"
+                        src={content.imagem}
+                        alt={content.titulo}
+                        className="content-image"
+                        style={{ marginBottom: "1rem", maxWidth: "100%" }}
                         onError={(e) => {
+                          e.target.onerror = null;
                           e.target.src = PLACEHOLDER_SVG;
                         }}
                       />
-                    ) : (
-                      <div className="project-placeholder">
-                        <span>📁 {project.titulo}</span>
-                      </div>
                     )}
-
-                    {project.url_externa && (
-                      <div className="project-link-overlay">
-                        <span>🔗 Clique para saber mais</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="project-info">
-                    <h3>
-                      {project.titulo}
-                      {project.url_externa && (
-                        <span className="link-icon">🔗</span>
-                      )}
-                    </h3>
-                    <p className="project-description">{project.descricao}</p>
-                    {project.data_inicio && (
-                      <p className="project-date">
-                        🗓️ Início:{" "}
-                        {new Date(project.data_inicio).toLocaleDateString(
-                          "pt-PT",
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section id="respostas-sociais" className="section">
-        <div className="container">
-          <div className="section-header-editable">
-            <h2>Respostas Sociais</h2>
-            {isEditMode && user && (
-              <button
-                className="btn-add-subsection"
-                onClick={() => handleAddSubsection("respostas-sociais")}
-                title="Adicionar resposta social"
-              >
-                ➥ Adicionar
-              </button>
-            )}
-          </div>
-
-          {loadingRespostas ? (
-            <p>A carregar respostas sociais...</p>
-          ) : respostasSociais.length === 0 ? (
-            <p>Oferecemos diversos serviços de apoio à comunidade.</p>
-          ) : (
-            <div className="institutional-content">
-              {respostasSociais.map((resposta) => (
-                <div
-                  key={resposta.id}
-                  className="content-subsection"
-                  onClick={() => !isEditMode && openResposta(resposta)}
-                  style={{ cursor: !isEditMode ? "pointer" : "default" }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) =>
-                    !isEditMode &&
-                    !e.target.closest(".subsection-actions") &&
-                    handleActionKeyDown(e, () => openResposta(resposta))
-                  }
-                >
-                  {resposta.imagem_destaque && (
-                    <img
-                      src={resposta.imagem_destaque}
-                      alt={resposta.titulo}
-                      className="content-image"
-                      style={{ marginBottom: "1rem", maxWidth: "100%" }}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = PLACEHOLDER_SVG;
-                      }}
-                    />
-                  )}
-                  <div className="subsection-header">
-                    <h3>{resposta.titulo}</h3>
-                    {isEditMode && user && (
-                      <div className="subsection-actions">
-                        <button
-                          className="btn-edit-inline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(
-                              "respostas-sociais",
-                              resposta,
-                              resposta.id,
-                            );
-                          }}
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-delete-inline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(resposta.id, "respostas-sociais");
-                          }}
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {(() => {
-                    const destaques = buildRespostaDestaques(
-                      resposta?.destaques,
-                    );
-                    if (!destaques.length) return null;
-                    return (
-                      <div
-                        className={`resposta-highlights resposta-highlights--${destaques.length}`}
-                      >
-                        {destaques.map((item, idx) => (
-                          <div
-                            key={`resposta-card-destaque-${idx}`}
-                            className="resposta-highlight"
-                          >
-                            {item.titulo && (
-                              <div className="resposta-highlight-title">
-                                {item.titulo}
-                              </div>
-                            )}
-                            {item.texto && (
-                              <div className="resposta-highlight-text">
-                                {item.texto}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  {(() => {
-                    const hasConteudo = !!stripHtml(resposta.conteudo || "");
-                    if (resposta.descricao && hasConteudo) {
-                      return (
-                        <p
-                          className="content-summary"
-                          style={{ fontStyle: "italic", marginTop: 8 }}
-                        >
-                          {resposta.descricao}
-                        </p>
-                      );
-                    }
-                    return null;
-                  })()}
-                  <div
-                    className="content-preview"
-                    dangerouslySetInnerHTML={{
-                      __html: resposta.conteudo || resposta.descricao || "",
-                    }}
-                  />
-                  <InlineGallery
-                    images={buildGalleryImages(
-                      resposta.imagem_destaque,
-                      resposta.media || [],
-                    )}
-                    altPrefix={resposta.titulo || "Imagem"}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section id="noticias" className="section">
-        <div className="container">
-          <div className="section-header-editable">
-            <h2>Notícias e Eventos</h2>
-            {isEditMode && user && (
-              <button
-                className="btn-add-subsection"
-                onClick={() => handleAddSubsection("noticias")}
-                title="Adicionar notícia"
-              >
-                ➥ Adicionar
-              </button>
-            )}
-          </div>
-
-          {loadingNoticias ? (
-            <p>A carregar notícias...</p>
-          ) : noticias.length === 0 ? (
-            <p>Mantenha-se atualizado com as nossas novidades.</p>
-          ) : (
-            <div className="institutional-content">
-              {noticias.slice(0, 5).map((noticia) => (
-                <div
-                  key={noticia.id}
-                  className="content-subsection noticia-item"
-                  onClick={() => openNews(noticia)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) =>
-                    !e.target.closest(".subsection-actions") &&
-                    handleActionKeyDown(e, () => openNews(noticia))
-                  }
-                >
-                  {noticia.imagem_destaque && (
-                    <img
-                      src={noticia.imagem_destaque}
-                      alt={noticia.titulo}
-                      className="noticia-image"
-                      onError={(e) => {
-                        console.warn("Imagem não encontrada:", e.target.src);
-                        e.target.src = PLACEHOLDER_SVG;
-                      }}
-                    />
-                  )}
-
-                  <div className="noticia-body">
-                    <h3 className="noticia-title">{noticia.titulo}</h3>
-                    <p className="noticia-summary">
-                      {noticia.resumo ||
-                        stripHtml(noticia.conteudo || "").slice(0, 200) + "..."}
-                    </p>
-                    <InlineGallery
-                      images={buildGalleryImages(
-                        noticia.imagem_destaque,
-                        noticia.media || [],
-                      )}
-                      altPrefix={noticia.titulo || "Imagem"}
-                    />
-                  </div>
-
-                  <p className="noticia-date">
-                    📅{" "}
-                    {new Date(
-                      noticia.data_publicacao || noticia.created_at,
-                    ).toLocaleDateString("pt-PT")}
-                  </p>
-
-                  {isEditMode && user && (
-                    <div className="subsection-actions noticia-actions">
-                      <button
-                        className="btn-edit-inline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit("noticias", noticia, noticia.id);
-                        }}
-                        title="Editar"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="btn-delete-inline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(noticia.id, "noticias");
-                        }}
-                        title="Eliminar"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section id="transparencia" className="section transparency-section">
-        <div className="container">
-          <div className="section-header-editable">
-            <h2>Transparência</h2>
-            {isEditMode && user && (
-              <button
-                className="btn-add-subsection"
-                onClick={goToTransparencyAdmin}
-                title="Adicionar documento de transparência"
-              >
-                + Adicionar
-              </button>
-            )}
-          </div>
-
-          {loadingTransparencia ? (
-            <p>A carregar documentos...</p>
-          ) : transparenciaDocs.length === 0 ? (
-            <p>Ainda não foram publicados relatórios.</p>
-          ) : (
-            <div className="transparency-grid">
-              {transparenciaDocs.map((doc) => (
-                <div key={doc.id} className="transparency-card">
-                  {isEditMode && user && (
-                    <div className="transparency-actions">
-                      <button
-                        className="btn-edit-inline"
-                        title="Editar documento"
-                        onClick={() => handleTranspEdit(doc)}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="btn-delete-inline"
-                        title="Eliminar documento"
-                        onClick={() => handleTranspDelete(doc.id)}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  )}
-                  <div className="transparency-thumb">
-                    <img
-                      src={PDF_PLACEHOLDER}
-                      alt={`Relatório ${doc.titulo || doc.ano || "PDF"}`}
-                      loading="lazy"
-                    />
-                  </div>
-                  <div className="transparency-meta">
-                    <h3>{doc.titulo || `Contas ${doc.ano || ""}`}</h3>
-                    <p className="transparency-date">
-                      {doc.ano ? `Ano: ${doc.ano}` : ""}
-                      {doc.data_criacao
-                        ? `${doc.ano ? " · " : ""}${formatDate(
-                            doc.data_criacao,
-                          )}`
-                        : ""}
-                    </p>
-                    {doc.descricao && (
-                      <p className="transparency-desc">{doc.descricao}</p>
-                    )}
-                    {doc.ficheiro_url && (
-                      <button
-                        className="btn-primary"
-                        onClick={() => window.open(doc.ficheiro_url, "_blank")}
-                      >
-                        Ver ficheiro
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Seções Personalizadas */}
-      {secoesPersonalizadas.map((secao) => {
-        const itens = itensSecoesPersonalizadas[secao.id] || [];
-        const formConfig = getFormConfig(secao);
-        const isMultipleForm = formConfig?.tipo === "multiple";
-        const formOptions = isMultipleForm
-          ? formConfig.opcoes || []
-          : formConfig
-            ? [{ tipo: formConfig.tipo, label: formConfig.label }]
-            : [];
-        const selectedFormType = formConfig
-          ? isMultipleForm
-            ? formSelections[secao.id] || formOptions[0]?.tipo
-            : formOptions[0]?.tipo
-          : null;
-        const selectedFormLabel = formOptions.find(
-          (o) => o.tipo === selectedFormType,
-        )?.label;
-
-        const crecheSections = secoesPersonalizadas.filter((s) => {
-          const key = `${s.slug || ""} ${s.nome || ""} ${
-            s.titulo || ""
-          }`.toLowerCase();
-          return key.includes("creche");
-        });
-        const crecheOptions = (
-          crecheSections.flatMap((s) => {
-            const items = itensSecoesPersonalizadas[s.id] || [];
-            return items.map((it, idx) => ({
-              id: it.id,
-              label: it.titulo || it.nome || `Creche ${idx + 1}`,
-            }));
-          }) || []
-        ).filter(Boolean);
-        const crecheOptionsWithAmbas = [
-          { id: "ambas", label: "Ambas" },
-          ...crecheOptions,
-        ];
-        const selectedCreche =
-          crecheSelecao[secao.id] || crecheOptionsWithAmbas[0]?.id || "ambas";
-
-        return (
-          <section key={secao.id} id={secao.slug} className="section">
-            <div className="container">
-              <div className="section-header-editable">
-                <h2>{secao.titulo}</h2>
-                {isEditMode && user && (
-                  <button
-                    className="btn-add-subsection"
-                    onClick={() =>
-                      handleAddSubsection("secao-personalizada", secao)
-                    }
-                    title="Adicionar item"
-                  >
-                    ➥ Adicionar
-                  </button>
-                )}
-              </div>
-
-              {secao.descricao && (
-                <p style={{ marginBottom: "2rem", color: "#666" }}>
-                  {secao.descricao}
-                </p>
-              )}
-
-              {loadingSecoes ? (
-                <p>A carregar...</p>
-              ) : itens.length === 0 ? null : secao.tipo_layout === "texto" ? (
-                /* Layout TEXTO - Mostra tudo expandido (como Valores) */
-                <div className="text-layout-content">
-                  {itens.map((item) => (
-                    <div key={item.id} className="text-item-full">
+                    <div className="subsection-header">
+                      <h3>{content.titulo}</h3>
                       {isEditMode && user && (
-                        <div
-                          className="subsection-actions"
-                          style={{ float: "right" }}
-                        >
+                        <div className="subsection-actions">
                           <button
                             className="btn-edit-inline"
                             onClick={() =>
-                              handleEdit(
-                                "secao-personalizada",
-                                item,
-                                item.id,
-                                secao,
-                              )
+                              handleEdit("institucional", content, content.id)
                             }
                             title="Editar"
                           >
@@ -2435,11 +1940,7 @@ const Home = ({ isEditMode = false }) => {
                           <button
                             className="btn-delete-inline"
                             onClick={() =>
-                              handleDelete(
-                                item.id,
-                                "secao-personalizada",
-                                secao.id,
-                              )
+                              handleDelete(content.id, "institucional")
                             }
                             title="Eliminar"
                           >
@@ -2447,69 +1948,206 @@ const Home = ({ isEditMode = false }) => {
                           </button>
                         </div>
                       )}
-                      {item.titulo && <h3>{item.titulo}</h3>}
-                      {item.imagem && (
+                    </div>
+
+                    {content.subtitulo && (
+                      <p
+                        className="content-summary"
+                        style={{ fontStyle: "italic", marginTop: 8 }}
+                      >
+                        {content.subtitulo}
+                      </p>
+                    )}
+                    {(() => {
+                      const destaques = buildRespostaDestaques(
+                        content?.destaques,
+                      );
+                      if (!destaques.length) return null;
+                      return (
+                        <div
+                          className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                        >
+                          {destaques.map((item, idx) => (
+                            <div
+                              key={`content-destaque-${idx}`}
+                              className="resposta-highlight"
+                            >
+                              {item.titulo && (
+                                <div className="resposta-highlight-title">
+                                  {item.titulo}
+                                </div>
+                              )}
+                              {item.texto && (
+                                <div className="resposta-highlight-text">
+                                  {item.texto}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    <div
+                      className="content-preview"
+                      dangerouslySetInnerHTML={{
+                        __html: content.conteudo || "",
+                      }}
+                    />
+                    <InlineGallery
+                      images={buildGalleryImages(
+                        content.imagem,
+                        content.media || [],
+                      )}
+                      altPrefix={content.titulo || "Imagem"}
+                    />
+                    {content.video_url && (
+                      <video controls className="content-video">
+                        <source src={content.video_url} type="video/mp4" />
+                      </video>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="projetos" className="section">
+          <div className="container">
+            <h2>Projetos</h2>
+
+            {loadingProjects ? (
+              <div className="loading-projects">A carregar projetos...</div>
+            ) : projects.length === 0 ? (
+              <p className="no-projects">
+                Nenhum projeto disponível no momento.
+              </p>
+            ) : (
+              <div className="projects-list">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className={`project-item ${
+                      project.url_externa ? "clickable" : ""
+                    }`}
+                    onClick={() => {
+                      if (project.url_externa) {
+                        window.open(project.url_externa, "_blank");
+                      }
+                    }}
+                    style={{
+                      cursor: project.url_externa ? "pointer" : "default",
+                    }}
+                    role={project.url_externa ? "link" : undefined}
+                    tabIndex={project.url_externa ? 0 : undefined}
+                    aria-label={
+                      project.url_externa
+                        ? `Abrir projeto ${project.titulo} (nova janela)`
+                        : undefined
+                    }
+                    onKeyDown={(e) => {
+                      if (!project.url_externa) return;
+                      handleActionKeyDown(e, () =>
+                        window.open(project.url_externa, "_blank"),
+                      );
+                    }}
+                  >
+                    <div className="project-image-container">
+                      {project.imagem_destaque ? (
                         <img
-                          src={item.imagem}
-                          alt={item.titulo}
-                          style={{
-                            maxWidth: "100%",
-                            marginBottom: "1rem",
-                            borderRadius: "8px",
-                          }}
+                          src={project.imagem_destaque}
+                          alt={project.titulo}
+                          className="project-image"
                           onError={(e) => {
-                            e.target.onerror = null;
                             e.target.src = PLACEHOLDER_SVG;
                           }}
                         />
+                      ) : (
+                        <div className="project-placeholder">
+                          <span>📁 {project.titulo}</span>
+                        </div>
                       )}
-                      {item.conteudo && (
-                        <div
-                          className="text-content-full"
-                          dangerouslySetInnerHTML={{ __html: item.conteudo }}
-                        />
-                      )}
-                      <InlineGallery
-                        images={buildGalleryImages(
-                          item.imagem,
-                          item.media || [],
-                        )}
-                        altPrefix={item.titulo || "Imagem"}
-                      />
-                      {item.video_url && (
-                        <video
-                          controls
-                          style={{ maxWidth: "100%", marginTop: "1rem" }}
-                        >
-                          <source src={item.video_url} type="video/mp4" />
-                        </video>
+
+                      {project.url_externa && (
+                        <div className="project-link-overlay">
+                          <span>🔗 Clique para saber mais</span>
+                        </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              ) : secao.tipo_layout === "galeria" ? (
-                /* Layout GALERIA - Grid de imagens clicáveis */
-                <div className="gallery-grid">
-                  {itens.map((item) => (
-                    <div
-                      key={item.id}
-                      className="gallery-item"
-                      onClick={(e) => {
-                        // Não abrir se clicou num botão
-                        if (e.target.closest(".subsection-actions")) return;
-                        openCustomItem(item);
-                      }}
-                      style={{ cursor: "pointer" }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (
-                          !e.target.closest(".subsection-actions")
-                        ) {
-                          handleActionKeyDown(e, () => openCustomItem(item));
-                        }
-                      }}
-                    >
+
+                    <div className="project-info">
+                      <h3>
+                        {project.titulo}
+                        {project.url_externa && (
+                          <span className="link-icon">🔗</span>
+                        )}
+                      </h3>
+                      <p className="project-description">{project.descricao}</p>
+                      {project.data_inicio && (
+                        <p className="project-date">
+                          🗓️ Início:{" "}
+                          {new Date(project.data_inicio).toLocaleDateString(
+                            "pt-PT",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="respostas-sociais" className="section">
+          <div className="container">
+            <div className="section-header-editable">
+              <h2>Respostas Sociais</h2>
+              {isEditMode && user && (
+                <button
+                  className="btn-add-subsection"
+                  onClick={() => handleAddSubsection("respostas-sociais")}
+                  title="Adicionar resposta social"
+                >
+                  ➥ Adicionar
+                </button>
+              )}
+            </div>
+
+            {loadingRespostas ? (
+              <p>A carregar respostas sociais...</p>
+            ) : respostasSociais.length === 0 ? (
+              <p>Oferecemos diversos serviços de apoio à comunidade.</p>
+            ) : (
+              <div className="institutional-content">
+                {respostasSociais.map((resposta) => (
+                  <div
+                    key={resposta.id}
+                    className="content-subsection"
+                    onClick={() => !isEditMode && openResposta(resposta)}
+                    style={{ cursor: !isEditMode ? "pointer" : "default" }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      !isEditMode &&
+                      !e.target.closest(".subsection-actions") &&
+                      handleActionKeyDown(e, () => openResposta(resposta))
+                    }
+                  >
+                    {resposta.imagem_destaque && (
+                      <img
+                        src={resposta.imagem_destaque}
+                        alt={resposta.titulo}
+                        className="content-image"
+                        style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = PLACEHOLDER_SVG;
+                        }}
+                      />
+                    )}
+                    <div className="subsection-header">
+                      <h3>{resposta.titulo}</h3>
                       {isEditMode && user && (
                         <div className="subsection-actions">
                           <button
@@ -2517,10 +2155,9 @@ const Home = ({ isEditMode = false }) => {
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEdit(
-                                "secao-personalizada",
-                                item,
-                                item.id,
-                                secao,
+                                "respostas-sociais",
+                                resposta,
+                                resposta.id,
                               );
                             }}
                             title="Editar"
@@ -2531,11 +2168,7 @@ const Home = ({ isEditMode = false }) => {
                             className="btn-delete-inline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDelete(
-                                item.id,
-                                "secao-personalizada",
-                                secao.id,
-                              );
+                              handleDelete(resposta.id, "respostas-sociais");
                             }}
                             title="Eliminar"
                           >
@@ -2543,2605 +2176,3213 @@ const Home = ({ isEditMode = false }) => {
                           </button>
                         </div>
                       )}
-                      {item.imagem ? (
-                        <img
-                          src={item.imagem}
-                          alt={item.titulo || "Imagem"}
-                          className="gallery-image"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = PLACEHOLDER_SVG;
-                          }}
-                        />
-                      ) : (
-                        <div className="gallery-placeholder">
-                          {item.titulo || "Sem imagem"}
-                        </div>
-                      )}
-                      {item.titulo && (
-                        <div className="gallery-title">{item.titulo}</div>
-                      )}
                     </div>
-                  ))}
-                </div>
-              ) : secao.tipo_layout === "lista" ? (
-                /* Layout LISTA - Lista vertical clicável */
-                <div className="list-layout">
-                  {itens.map((item) => (
-                    <div
-                      key={item.id}
-                      className="list-item"
-                      onClick={(e) => {
-                        // Não abrir se clicou num botão
-                        if (e.target.closest(".subsection-actions")) return;
-                        openCustomItem(item);
-                      }}
-                      style={{ cursor: "pointer" }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (
-                          !e.target.closest(".subsection-actions")
-                        ) {
-                          handleActionKeyDown(e, () => openCustomItem(item));
-                        }
-                      }}
-                    >
-                      {item.imagem && (
-                        <img
-                          src={item.imagem}
-                          alt={item.titulo || "Imagem"}
-                          className="content-image"
-                          style={{ marginBottom: "0.75rem", maxWidth: "100%" }}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = PLACEHOLDER_SVG;
-                          }}
-                        />
-                      )}
-                      <div className="list-item-header">
-                        {item.titulo && <h3>{item.titulo}</h3>}
-                        {isEditMode && user && (
-                          <div className="subsection-actions">
-                            <button
-                              className="btn-edit-inline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(
-                                  "secao-personalizada",
-                                  item,
-                                  item.id,
-                                  secao,
-                                );
-                              }}
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              className="btn-delete-inline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(
-                                  item.id,
-                                  "secao-personalizada",
-                                  secao.id,
-                                );
-                              }}
-                              title="Eliminar"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {item.subtitulo && (
-                        <p className="list-item-description">
-                          {item.subtitulo}
-                        </p>
-                      )}
-                      <InlineGallery
-                        images={buildGalleryImages(
-                          item.imagem,
-                          item.media || [],
-                        )}
-                        altPrefix={item.titulo || "Imagem"}
-                      />
-                      <span className="list-item-more">Ver mais →</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                /* Layout CARDS (padrão) - Grid de cards clicáveis */
-                <div className="institutional-content">
-                  {itens.map((item) => (
-                    <div
-                      key={item.id}
-                      className="content-subsection"
-                      onClick={(e) => {
-                        // Não abrir se clicou num botão
-                        if (e.target.closest(".subsection-actions")) return;
-                        if (item.link_externo) {
-                          window.open(item.link_externo, "_blank");
-                        } else {
-                          openCustomItem(item);
-                        }
-                      }}
-                      style={{
-                        cursor: "pointer",
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (
-                          !e.target.closest(".subsection-actions")
-                        ) {
-                          handleActionKeyDown(e, () => {
-                            if (item.link_externo) {
-                              window.open(item.link_externo, "_blank");
-                            } else {
-                              openCustomItem(item);
-                            }
-                          });
-                        }
-                      }}
-                    >
-                      {item.imagem && (
-                        <img
-                          src={item.imagem}
-                          alt={item.titulo}
-                          className="content-image"
-                          style={{ marginBottom: "1rem", maxWidth: "100%" }}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = PLACEHOLDER_SVG;
-                          }}
-                        />
-                      )}
-                      <div className="subsection-header">
-                        {item.titulo && <h3>{item.titulo}</h3>}
-                        {isEditMode && user && (
-                          <div className="subsection-actions">
-                            <button
-                              className="btn-edit-inline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(
-                                  "secao-personalizada",
-                                  item,
-                                  item.id,
-                                  secao,
-                                );
-                              }}
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              className="btn-delete-inline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(
-                                  item.id,
-                                  "secao-personalizada",
-                                  secao.id,
-                                );
-                              }}
-                              title="Eliminar"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {item.subtitulo && (
-                        <p
-                          style={{
-                            fontStyle: "italic",
-                            color: "#666",
-                            marginTop: "0.5rem",
-                          }}
-                        >
-                          {item.subtitulo}
-                        </p>
-                      )}
-                      {item.conteudo && (
+                    {(() => {
+                      const destaques = buildRespostaDestaques(
+                        resposta?.destaques,
+                      );
+                      if (!destaques.length) return null;
+                      return (
                         <div
-                          className="content-preview"
-                          dangerouslySetInnerHTML={{
-                            __html: item.conteudo,
-                          }}
-                        />
+                          className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                        >
+                          {destaques.map((item, idx) => (
+                            <div
+                              key={`resposta-card-destaque-${idx}`}
+                              className="resposta-highlight"
+                            >
+                              {item.titulo && (
+                                <div className="resposta-highlight-title">
+                                  {item.titulo}
+                                </div>
+                              )}
+                              {item.texto && (
+                                <div className="resposta-highlight-text">
+                                  {item.texto}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const hasConteudo = !!stripHtml(resposta.conteudo || "");
+                      if (resposta.descricao && hasConteudo) {
+                        return (
+                          <p
+                            className="content-summary"
+                            style={{ fontStyle: "italic", marginTop: 8 }}
+                          >
+                            {resposta.descricao}
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <div
+                      className="content-preview"
+                      dangerouslySetInnerHTML={{
+                        __html: resposta.conteudo || resposta.descricao || "",
+                      }}
+                    />
+                    <InlineGallery
+                      images={buildGalleryImages(
+                        resposta.imagem_destaque,
+                        resposta.media || [],
                       )}
+                      altPrefix={resposta.titulo || "Imagem"}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="noticias" className="section">
+          <div className="container">
+            <div className="section-header-editable">
+              <h2>Notícias e Eventos</h2>
+              {isEditMode && user && (
+                <button
+                  className="btn-add-subsection"
+                  onClick={() => handleAddSubsection("noticias")}
+                  title="Adicionar notícia"
+                >
+                  ➥ Adicionar
+                </button>
+              )}
+            </div>
+
+            {loadingNoticias ? (
+              <p>A carregar notícias...</p>
+            ) : noticias.length === 0 ? (
+              <p>Mantenha-se atualizado com as nossas novidades.</p>
+            ) : (
+              <div className="institutional-content">
+                {noticias.slice(0, 5).map((noticia) => (
+                  <div
+                    key={noticia.id}
+                    className="content-subsection noticia-item"
+                    onClick={() => openNews(noticia)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      !e.target.closest(".subsection-actions") &&
+                      handleActionKeyDown(e, () => openNews(noticia))
+                    }
+                  >
+                    {noticia.imagem_destaque && (
+                      <img
+                        src={noticia.imagem_destaque}
+                        alt={noticia.titulo}
+                        className="noticia-image"
+                        onError={(e) => {
+                          console.warn("Imagem não encontrada:", e.target.src);
+                          e.target.src = PLACEHOLDER_SVG;
+                        }}
+                      />
+                    )}
+
+                    <div className="noticia-body">
+                      <h3 className="noticia-title">{noticia.titulo}</h3>
+                      <p className="noticia-summary">
+                        {noticia.resumo ||
+                          stripHtml(noticia.conteudo || "").slice(0, 200) +
+                            "..."}
+                      </p>
+                      {(() => {
+                        const destaques = buildRespostaDestaques(
+                          noticia?.destaques,
+                        );
+                        if (!destaques.length) return null;
+                        return (
+                          <div
+                            className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                            style={{ marginTop: "1rem" }}
+                          >
+                            {destaques.map((item, idx) => (
+                              <div
+                                key={`noticia-destaque-${idx}`}
+                                className="resposta-highlight"
+                              >
+                                {item.titulo && (
+                                  <div className="resposta-highlight-title">
+                                    {item.titulo}
+                                  </div>
+                                )}
+                                {item.texto && (
+                                  <div className="resposta-highlight-text">
+                                    {item.texto}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       <InlineGallery
                         images={buildGalleryImages(
-                          item.imagem,
-                          item.media || [],
+                          noticia.imagem_destaque,
+                          noticia.media || [],
                         )}
-                        altPrefix={item.titulo || "Imagem"}
+                        altPrefix={noticia.titulo || "Imagem"}
                       />
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {/* Formulários configuráveis por secção */}
-              {formConfig && selectedFormType && (
-                <div
-                  className="contact-form"
-                  style={{ marginTop: "3rem", position: "relative" }}
+                    <p className="noticia-date">
+                      📅{" "}
+                      {new Date(
+                        noticia.data_publicacao || noticia.created_at,
+                      ).toLocaleDateString("pt-PT")}
+                    </p>
+
+                    {isEditMode && user && (
+                      <div className="subsection-actions noticia-actions">
+                        <button
+                          className="btn-edit-inline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit("noticias", noticia, noticia.id);
+                          }}
+                          title="Editar"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="btn-delete-inline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(noticia.id, "noticias");
+                          }}
+                          title="Eliminar"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="transparencia" className="section transparency-section">
+          <div className="container">
+            <div className="section-header-editable">
+              <h2>Transparência</h2>
+              {isEditMode && user && (
+                <button
+                  className="btn-add-subsection"
+                  onClick={goToTransparencyAdmin}
+                  title="Adicionar documento de transparência"
                 >
+                  + Adicionar
+                </button>
+              )}
+            </div>
+
+            {loadingTransparencia ? (
+              <p>A carregar documentos...</p>
+            ) : transparenciaDocs.length === 0 ? (
+              <p>Ainda não foram publicados relatórios.</p>
+            ) : (
+              <div className="transparency-grid">
+                {transparenciaDocs.map((doc) => (
+                  <div key={doc.id} className="transparency-card">
+                    {isEditMode && user && (
+                      <div className="transparency-actions">
+                        <button
+                          className="btn-edit-inline"
+                          title="Editar documento"
+                          onClick={() => handleTranspEdit(doc)}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className="btn-delete-inline"
+                          title="Eliminar documento"
+                          onClick={() => handleTranspDelete(doc.id)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                    <div className="transparency-thumb">
+                      <img
+                        src={PDF_PLACEHOLDER}
+                        alt={`Relatório ${doc.titulo || doc.ano || "PDF"}`}
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="transparency-meta">
+                      <h3>{doc.titulo || `Contas ${doc.ano || ""}`}</h3>
+                      <p className="transparency-date">
+                        {doc.ano ? `Ano: ${doc.ano}` : ""}
+                        {doc.data_criacao
+                          ? `${doc.ano ? " · " : ""}${formatDate(
+                              doc.data_criacao,
+                            )}`
+                          : ""}
+                      </p>
+                      {doc.descricao && (
+                        <p className="transparency-desc">{doc.descricao}</p>
+                      )}
+                      {doc.ficheiro_url && (
+                        <button
+                          className="btn-primary"
+                          onClick={() =>
+                            window.open(doc.ficheiro_url, "_blank")
+                          }
+                        >
+                          Ver ficheiro
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Seções Personalizadas */}
+        {secoesPersonalizadas.map((secao) => {
+          const itens = itensSecoesPersonalizadas[secao.id] || [];
+          const formConfig = getFormConfig(secao);
+          const isMultipleForm = formConfig?.tipo === "multiple";
+          const formOptions = isMultipleForm
+            ? formConfig.opcoes || []
+            : formConfig
+              ? [{ tipo: formConfig.tipo, label: formConfig.label }]
+              : [];
+          const selectedFormType = formConfig
+            ? isMultipleForm
+              ? formSelections[secao.id] || formOptions[0]?.tipo
+              : formOptions[0]?.tipo
+            : null;
+          const selectedFormLabel = formOptions.find(
+            (o) => o.tipo === selectedFormType,
+          )?.label;
+
+          const crecheSections = secoesPersonalizadas.filter((s) => {
+            const key = `${s.slug || ""} ${s.nome || ""} ${
+              s.titulo || ""
+            }`.toLowerCase();
+            return key.includes("creche");
+          });
+          const crecheOptions = (
+            crecheSections.flatMap((s) => {
+              const items = itensSecoesPersonalizadas[s.id] || [];
+              return items.map((it, idx) => ({
+                id: it.id,
+                label: it.titulo || it.nome || `Creche ${idx + 1}`,
+              }));
+            }) || []
+          ).filter(Boolean);
+          const crecheOptionsWithAmbas = [
+            { id: "ambas", label: "Ambas" },
+            ...crecheOptions,
+          ];
+          const selectedCreche =
+            crecheSelecao[secao.id] || crecheOptionsWithAmbas[0]?.id || "ambas";
+
+          return (
+            <section key={secao.id} id={secao.slug} className="section">
+              <div className="container">
+                <div className="section-header-editable">
+                  <h2>{secao.titulo}</h2>
                   {isEditMode && user && (
                     <button
-                      className="btn-delete-inline"
-                      onClick={async () => {
-                        if (
-                          window.confirm(
-                            "Tem certeza que deseja remover o formulário desta secção?",
-                          )
-                        ) {
-                          try {
-                            await api.put(
-                              `/secoes-personalizadas/${secao.id}`,
-                              {
-                                ...secao,
-                                tem_formulario: false,
-                                config_formulario: null,
-                              },
-                            );
-                            setSecoesPersonalizadas(
-                              secoesPersonalizadas.map((s) =>
-                                s.id === secao.id
-                                  ? {
-                                      ...s,
-                                      tem_formulario: false,
-                                      config_formulario: null,
-                                    }
-                                  : s,
-                              ),
-                            );
-                            alert("Formulário removido com sucesso!");
-                          } catch (error) {
-                            console.error("Erro ao remover formulário:", error);
-                            alert("Erro ao remover formulário.");
-                          }
-                        }
-                      }}
-                      style={{
-                        position: "absolute",
-                        top: "10px",
-                        right: "10px",
-                        zIndex: 10,
-                      }}
-                      title="Remover formulário"
+                      className="btn-add-subsection"
+                      onClick={() =>
+                        handleAddSubsection("secao-personalizada", secao)
+                      }
+                      title="Adicionar item"
                     >
-                      🗑️
+                      ➥ Adicionar
                     </button>
                   )}
+                </div>
 
-                  {isMultipleForm && formOptions.length > 1 && (
-                    <div className="form-selector">
-                      {formConfig.titulo?.trim() && (
-                        <p className="form-selector-title">
-                          {formConfig.titulo}
-                        </p>
-                      )}
-                      {formConfig.descricao && (
-                        <p className="form-selector-description">
-                          {formConfig.descricao}
-                        </p>
-                      )}
-                      <div className="form-selector-options">
-                        {formOptions.map((opt) => (
-                          <label
-                            key={opt.tipo}
-                            className={`form-option-card ${
-                              selectedFormType === opt.tipo ? "selected" : ""
-                            }`}
+                {secao.descricao && (
+                  <p style={{ marginBottom: "2rem", color: "#666" }}>
+                    {secao.descricao}
+                  </p>
+                )}
+
+                {loadingSecoes ? (
+                  <p>A carregar...</p>
+                ) : itens.length === 0 ? null : secao.tipo_layout ===
+                  "texto" ? (
+                  /* Layout TEXTO - Mostra tudo expandido (como Valores) */
+                  <div className="text-layout-content">
+                    {itens.map((item) => (
+                      <div key={item.id} className="text-item-full">
+                        {isEditMode && user && (
+                          <div
+                            className="subsection-actions"
+                            style={{ float: "right" }}
                           >
-                            <input
-                              type="radio"
-                              name={`form-choice-${secao.id}`}
-                              value={opt.tipo}
-                              checked={selectedFormType === opt.tipo}
-                              onChange={() =>
-                                setFormSelections((prev) => ({
-                                  ...prev,
-                                  [secao.id]: opt.tipo,
-                                }))
+                            <button
+                              className="btn-edit-inline"
+                              onClick={() =>
+                                handleEdit(
+                                  "secao-personalizada",
+                                  item,
+                                  item.id,
+                                  secao,
+                                )
                               }
-                            />
-                            <span>{opt.label}</span>
-                          </label>
-                        ))}
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className="btn-delete-inline"
+                              onClick={() =>
+                                handleDelete(
+                                  item.id,
+                                  "secao-personalizada",
+                                  secao.id,
+                                )
+                              }
+                              title="Eliminar"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        )}
+                        {item.titulo && <h3>{item.titulo}</h3>}
+                        {item.imagem && (
+                          <img
+                            src={item.imagem}
+                            alt={item.titulo}
+                            style={{
+                              maxWidth: "100%",
+                              marginBottom: "1rem",
+                              borderRadius: "8px",
+                            }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        )}
+                        {(() => {
+                          const destaques = buildRespostaDestaques(
+                            item?.destaques,
+                          );
+                          if (!destaques.length) return null;
+                          return (
+                            <div
+                              className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                            >
+                              {destaques.map((destItem, idx) => (
+                                <div
+                                  key={`item-destaque-${idx}`}
+                                  className="resposta-highlight"
+                                >
+                                  {destItem.titulo && (
+                                    <div className="resposta-highlight-title">
+                                      {destItem.titulo}
+                                    </div>
+                                  )}
+                                  {destItem.texto && (
+                                    <div className="resposta-highlight-text">
+                                      {destItem.texto}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        {item.conteudo && (
+                          <div
+                            className="text-content-full"
+                            dangerouslySetInnerHTML={{ __html: item.conteudo }}
+                          />
+                        )}
+                        <InlineGallery
+                          images={buildGalleryImages(
+                            item.imagem,
+                            item.media || [],
+                          )}
+                          altPrefix={item.titulo || "Imagem"}
+                        />
+                        {item.video_url && (
+                          <video
+                            controls
+                            style={{ maxWidth: "100%", marginTop: "1rem" }}
+                          >
+                            <source src={item.video_url} type="video/mp4" />
+                          </video>
+                        )}
                       </div>
-                    </div>
-                  )}
-
-                  {selectedFormType === "contacto" && (
-                    <>
-                      <h3>{selectedFormLabel || "Envie-nos uma mensagem"}</h3>
-                      <form
-                        className="erpi-form"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
-                          const data = {
-                            nome: form.nome.value,
-                            email: form.email.value,
-                            assunto: form.assunto.value,
-                            mensagem: form.mensagem.value,
-                            secao_personalizada_id: secao.id,
-                            formulario_escolhido:
-                              selectedFormLabel || selectedFormType,
-                          };
-                          try {
-                            const resp = await api.post(
-                              "/contactos/form",
-                              data,
-                            );
-                            if (resp.data && resp.data.success) {
-                              alert("Mensagem enviada. Obrigado!");
-                              form.reset();
-                            } else {
-                              alert("Erro ao enviar mensagem.");
-                            }
-                          } catch (err) {
-                            console.error(err);
-                            alert("Erro ao enviar mensagem.");
+                    ))}
+                  </div>
+                ) : secao.tipo_layout === "galeria" ? (
+                  /* Layout GALERIA - Grid de imagens clicáveis */
+                  <div className="gallery-grid">
+                    {itens.map((item) => (
+                      <div
+                        key={item.id}
+                        className="gallery-item"
+                        onClick={(e) => {
+                          // Não abrir se clicou num botão
+                          if (e.target.closest(".subsection-actions")) return;
+                          openCustomItem(item);
+                        }}
+                        style={{ cursor: "pointer" }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (!e.target.closest(".subsection-actions")) {
+                            handleActionKeyDown(e, () => openCustomItem(item));
                           }
                         }}
                       >
-                        <div className="form-row">
-                          <div className="form-field name-field">
-                            <label htmlFor={`nome-${secao.id}`}>Nome</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👤</span>
-                              <input
-                                id={`nome-${secao.id}`}
-                                name="nome"
-                                placeholder="Nome"
-                                required
-                              />
-                            </div>
+                        {isEditMode && user && (
+                          <div className="subsection-actions">
+                            <button
+                              className="btn-edit-inline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(
+                                  "secao-personalizada",
+                                  item,
+                                  item.id,
+                                  secao,
+                                );
+                              }}
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className="btn-delete-inline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(
+                                  item.id,
+                                  "secao-personalizada",
+                                  secao.id,
+                                );
+                              }}
+                              title="Eliminar"
+                            >
+                              🗑️
+                            </button>
                           </div>
-
-                          <div className="form-field email-field">
-                            <label htmlFor={`email-${secao.id}`}>Email</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">✉️</span>
-                              <input
-                                id={`email-${secao.id}`}
-                                name="email"
-                                type="email"
-                                placeholder="Email"
-                                required
-                              />
-                            </div>
+                        )}
+                        {item.imagem ? (
+                          <img
+                            src={item.imagem}
+                            alt={item.titulo || "Imagem"}
+                            className="gallery-image"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        ) : (
+                          <div className="gallery-placeholder">
+                            {item.titulo || "Sem imagem"}
                           </div>
+                        )}
+                        {item.titulo && (
+                          <div className="gallery-title">{item.titulo}</div>
+                        )}
+                        {item.subtitulo && (
+                          <div className="gallery-subtitle">
+                            {item.subtitulo}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : secao.tipo_layout === "lista" ? (
+                  /* Layout LISTA - Lista vertical clicável */
+                  <div className="list-layout">
+                    {itens.map((item) => (
+                      <div
+                        key={item.id}
+                        className="list-item"
+                        onClick={(e) => {
+                          // Não abrir se clicou num botão
+                          if (e.target.closest(".subsection-actions")) return;
+                          openCustomItem(item);
+                        }}
+                        style={{ cursor: "pointer" }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (!e.target.closest(".subsection-actions")) {
+                            handleActionKeyDown(e, () => openCustomItem(item));
+                          }
+                        }}
+                      >
+                        {item.imagem && (
+                          <img
+                            src={item.imagem}
+                            alt={item.titulo || "Imagem"}
+                            className="content-image"
+                            style={{
+                              marginBottom: "0.75rem",
+                              maxWidth: "100%",
+                            }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        )}
+                        <div className="list-item-header">
+                          {item.titulo && <h3>{item.titulo}</h3>}
+                          {isEditMode && user && (
+                            <div className="subsection-actions">
+                              <button
+                                className="btn-edit-inline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(
+                                    "secao-personalizada",
+                                    item,
+                                    item.id,
+                                    secao,
+                                  );
+                                }}
+                                title="Editar"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn-delete-inline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(
+                                    item.id,
+                                    "secao-personalizada",
+                                    secao.id,
+                                  );
+                                }}
+                                title="Eliminar"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          )}
                         </div>
+                        {item.subtitulo && (
+                          <p className="list-item-description">
+                            {item.subtitulo}
+                          </p>
+                        )}
+                        {(() => {
+                          const destaques = buildRespostaDestaques(
+                            item?.destaques,
+                          );
+                          if (!destaques.length) return null;
+                          return (
+                            <div
+                              className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                              style={{ marginTop: "0.75rem" }}
+                            >
+                              {destaques.map((destItem, idx) => (
+                                <div
+                                  key={`lista-destaque-${idx}`}
+                                  className="resposta-highlight"
+                                >
+                                  {destItem.titulo && (
+                                    <div className="resposta-highlight-title">
+                                      {destItem.titulo}
+                                    </div>
+                                  )}
+                                  {destItem.texto && (
+                                    <div className="resposta-highlight-text">
+                                      {destItem.texto}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        <InlineGallery
+                          images={buildGalleryImages(
+                            item.imagem,
+                            item.media || [],
+                          )}
+                          altPrefix={item.titulo || "Imagem"}
+                        />
+                        <span className="list-item-more">Ver mais →</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Layout CARDS (padrão) - Grid de cards clicáveis */
+                  <div className="institutional-content">
+                    {itens.map((item) => (
+                      <div
+                        key={item.id}
+                        className="content-subsection"
+                        onClick={(e) => {
+                          // Não abrir se clicou num botão
+                          if (e.target.closest(".subsection-actions")) return;
+                          if (item.link_externo) {
+                            window.open(item.link_externo, "_blank");
+                          } else {
+                            openCustomItem(item);
+                          }
+                        }}
+                        style={{
+                          cursor: "pointer",
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (!e.target.closest(".subsection-actions")) {
+                            handleActionKeyDown(e, () => {
+                              if (item.link_externo) {
+                                window.open(item.link_externo, "_blank");
+                              } else {
+                                openCustomItem(item);
+                              }
+                            });
+                          }
+                        }}
+                      >
+                        {item.imagem && (
+                          <img
+                            src={item.imagem}
+                            alt={item.titulo}
+                            className="content-image"
+                            style={{ marginBottom: "1rem", maxWidth: "100%" }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = PLACEHOLDER_SVG;
+                            }}
+                          />
+                        )}
+                        <div className="subsection-header">
+                          {item.titulo && <h3>{item.titulo}</h3>}
+                          {isEditMode && user && (
+                            <div className="subsection-actions">
+                              <button
+                                className="btn-edit-inline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(
+                                    "secao-personalizada",
+                                    item,
+                                    item.id,
+                                    secao,
+                                  );
+                                }}
+                                title="Editar"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn-delete-inline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(
+                                    item.id,
+                                    "secao-personalizada",
+                                    secao.id,
+                                  );
+                                }}
+                                title="Eliminar"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {item.subtitulo && (
+                          <p
+                            style={{
+                              fontStyle: "italic",
+                              color: "#666",
+                              marginTop: "0.5rem",
+                            }}
+                          >
+                            {item.subtitulo}
+                          </p>
+                        )}
+                        {(() => {
+                          const destaques = buildRespostaDestaques(
+                            item?.destaques,
+                          );
+                          if (!destaques.length) return null;
+                          return (
+                            <div
+                              className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                              style={{ marginTop: "0.75rem" }}
+                            >
+                              {destaques.map((destItem, idx) => (
+                                <div
+                                  key={`card-destaque-${idx}`}
+                                  className="resposta-highlight"
+                                >
+                                  {destItem.titulo && (
+                                    <div className="resposta-highlight-title">
+                                      {destItem.titulo}
+                                    </div>
+                                  )}
+                                  {destItem.texto && (
+                                    <div className="resposta-highlight-text">
+                                      {destItem.texto}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        {item.conteudo && (
+                          <div
+                            className="content-preview"
+                            dangerouslySetInnerHTML={{
+                              __html: item.conteudo,
+                            }}
+                          />
+                        )}
+                        <InlineGallery
+                          images={buildGalleryImages(
+                            item.imagem,
+                            item.media || [],
+                          )}
+                          altPrefix={item.titulo || "Imagem"}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                        <div className="form-field subject-field">
-                          <label htmlFor={`assunto-${secao.id}`}>Assunto</label>
-                          <div className="input-with-icon">
-                            <span className="input-icon">📝</span>
-                            <input
-                              id={`assunto-${secao.id}`}
-                              name="assunto"
-                              placeholder="Assunto"
+                {/* Formulários configuráveis por secção */}
+                {formConfig && selectedFormType && (
+                  <div
+                    className="contact-form"
+                    style={{ marginTop: "3rem", position: "relative" }}
+                  >
+                    {isEditMode && user && (
+                      <button
+                        className="btn-delete-inline"
+                        onClick={async () => {
+                          if (
+                            window.confirm(
+                              "Tem certeza que deseja remover o formulário desta secção?",
+                            )
+                          ) {
+                            try {
+                              await api.put(
+                                `/secoes-personalizadas/${secao.id}`,
+                                {
+                                  ...secao,
+                                  tem_formulario: false,
+                                  config_formulario: null,
+                                },
+                              );
+                              setSecoesPersonalizadas(
+                                secoesPersonalizadas.map((s) =>
+                                  s.id === secao.id
+                                    ? {
+                                        ...s,
+                                        tem_formulario: false,
+                                        config_formulario: null,
+                                      }
+                                    : s,
+                                ),
+                              );
+                              alert("Formulário removido com sucesso!");
+                            } catch (error) {
+                              console.error(
+                                "Erro ao remover formulário:",
+                                error,
+                              );
+                              alert("Erro ao remover formulário.");
+                            }
+                          }
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          right: "10px",
+                          zIndex: 10,
+                        }}
+                        title="Remover formulário"
+                      >
+                        🗑️
+                      </button>
+                    )}
+
+                    {isMultipleForm && formOptions.length > 1 && (
+                      <div className="form-selector">
+                        {formConfig.titulo?.trim() && (
+                          <p className="form-selector-title">
+                            {formConfig.titulo}
+                          </p>
+                        )}
+                        {formConfig.descricao && (
+                          <p className="form-selector-description">
+                            {formConfig.descricao}
+                          </p>
+                        )}
+                        <div className="form-selector-options">
+                          {formOptions.map((opt) => (
+                            <label
+                              key={opt.tipo}
+                              className={`form-option-card ${
+                                selectedFormType === opt.tipo ? "selected" : ""
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`form-choice-${secao.id}`}
+                                value={opt.tipo}
+                                checked={selectedFormType === opt.tipo}
+                                onChange={() =>
+                                  setFormSelections((prev) => ({
+                                    ...prev,
+                                    [secao.id]: opt.tipo,
+                                  }))
+                                }
+                              />
+                              <span>{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedFormType === "contacto" && (
+                      <>
+                        <h3>{selectedFormLabel || "Envie-nos uma mensagem"}</h3>
+                        <form
+                          className="erpi-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.currentTarget;
+                            const data = {
+                              nome: form.nome.value,
+                              email: form.email.value,
+                              assunto: form.assunto.value,
+                              mensagem: form.mensagem.value,
+                              secao_personalizada_id: secao.id,
+                              formulario_escolhido:
+                                selectedFormLabel || selectedFormType,
+                            };
+                            try {
+                              const resp = await api.post(
+                                "/contactos/form",
+                                data,
+                              );
+                              if (resp.data && resp.data.success) {
+                                alert("Mensagem enviada. Obrigado!");
+                                form.reset();
+                              } else {
+                                alert("Erro ao enviar mensagem.");
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert("Erro ao enviar mensagem.");
+                            }
+                          }}
+                        >
+                          <div className="form-row">
+                            <div className="form-field name-field">
+                              <label htmlFor={`nome-${secao.id}`}>Nome</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👤</span>
+                                <input
+                                  id={`nome-${secao.id}`}
+                                  name="nome"
+                                  placeholder="Nome"
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <div className="form-field email-field">
+                              <label htmlFor={`email-${secao.id}`}>Email</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">✉️</span>
+                                <input
+                                  id={`email-${secao.id}`}
+                                  name="email"
+                                  type="email"
+                                  placeholder="Email"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-field subject-field">
+                            <label htmlFor={`assunto-${secao.id}`}>
+                              Assunto
+                            </label>
+                            <div className="input-with-icon">
+                              <span className="input-icon">📝</span>
+                              <input
+                                id={`assunto-${secao.id}`}
+                                name="assunto"
+                                placeholder="Assunto"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-field message-field">
+                            <label htmlFor={`mensagem-${secao.id}`}>
+                              Mensagem
+                            </label>
+                            <textarea
+                              id={`mensagem-${secao.id}`}
+                              name="mensagem"
+                              rows="6"
+                              placeholder="Mensagem"
                               required
                             />
                           </div>
-                        </div>
 
-                        <div className="form-field message-field">
-                          <label htmlFor={`mensagem-${secao.id}`}>
-                            Mensagem
-                          </label>
-                          <textarea
-                            id={`mensagem-${secao.id}`}
-                            name="mensagem"
-                            rows="6"
-                            placeholder="Mensagem"
-                            required
-                          />
-                        </div>
-
-                        <div className="form-actions" style={{ marginTop: 10 }}>
-                          <button type="submit" className="btn-save">
-                            Enviar Mensagem
-                          </button>
-                        </div>
-                      </form>
-                    </>
-                  )}
-
-                  {selectedFormType === "erpi" && (
-                    <>
-                      <h3>{selectedFormLabel || "Formulário ERPI"}</h3>
-                      <form
-                        className="erpi-form"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
-                          const data = {
-                            nome_completo: form.nome_completo.value,
-                            data_nascimento: form.data_nascimento.value,
-                            morada_completa: form.morada_completa.value,
-                            codigo_postal: form.codigo_postal.value,
-                            concelho: form.concelho.value,
-                            distrito: form.distrito.value,
-                            cc_bi_numero: form.cc_bi_numero.value,
-                            nif: form.nif.value,
-                            niss: form.niss.value,
-                            numero_utente: form.numero_utente.value,
-                            contacto_nome_completo:
-                              form.contacto_nome_completo.value,
-                            contacto_telefone: form.contacto_telefone.value,
-                            contacto_email: form.contacto_email.value,
-                            contacto_parentesco: form.contacto_parentesco.value,
-                            observacoes: form.observacoes.value,
-                            origem_submissao: "site-secao-personalizada",
-                            secao_personalizada_id: secao.id,
-                            formulario_escolhido:
-                              selectedFormLabel || selectedFormType,
-                          };
-
-                          if (
-                            !data.nome_completo ||
-                            !data.data_nascimento ||
-                            !data.morada_completa ||
-                            !data.codigo_postal ||
-                            !data.concelho ||
-                            !data.distrito ||
-                            !data.cc_bi_numero ||
-                            !data.nif ||
-                            !data.niss ||
-                            !data.numero_utente ||
-                            !data.contacto_nome_completo ||
-                            !data.contacto_telefone ||
-                            !data.contacto_email ||
-                            !data.contacto_parentesco
-                          ) {
-                            alert("Preencha todos os campos obrigatórios.");
-                            return;
-                          }
-
-                          try {
-                            const resp = await api.post("/forms/erpi", data);
-                            if (resp.data?.success) {
-                              alert(
-                                "Inscrição ERPI enviada. Entraremos em contacto.",
-                              );
-                              form.reset();
-                            } else {
-                              alert("Erro ao enviar inscrição.");
-                            }
-                          } catch (err) {
-                            console.error(err);
-                            alert("Erro ao enviar inscrição.");
-                          }
-                        }}
-                      >
-                        <div className="form-row row-name-birth">
-                          <div className="form-field name-field">
-                            <label htmlFor={`nome_completo-${secao.id}`}>
-                              Nome completo
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👤</span>
-                              <input
-                                id={`nome_completo-${secao.id}`}
-                                name="nome_completo"
-                                placeholder="Nome completo"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`data_nascimento-${secao.id}`}>
-                              Data de nascimento
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">📅</span>
-                              <input
-                                id={`data_nascimento-${secao.id}`}
-                                name="data_nascimento"
-                                type="date"
-                                min={DATE_MIN}
-                                max={DATE_MAX}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-address">
-                          <div className="form-field">
-                            <label htmlFor={`morada_completa-${secao.id}`}>
-                              Morada completa
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏠</span>
-                              <input
-                                id={`morada_completa-${secao.id}`}
-                                name="morada_completa"
-                                placeholder="Rua, nº, andar"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`codigo_postal-${secao.id}`}>
-                              Código Postal
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏷️</span>
-                              <input
-                                id={`codigo_postal-${secao.id}`}
-                                name="codigo_postal"
-                                placeholder="0000-000"
-                                pattern={POSTAL_PATTERN}
-                                title={POSTAL_TITLE}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-location-2">
-                          <div className="form-field">
-                            <label htmlFor={`concelho-${secao.id}`}>
-                              Concelho
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏘️</span>
-                              <input
-                                id={`concelho-${secao.id}`}
-                                name="concelho"
-                                placeholder="Concelho"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`distrito-${secao.id}`}>
-                              Distrito
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🗺️</span>
-                              <input
-                                id={`distrito-${secao.id}`}
-                                name="distrito"
-                                placeholder="Distrito"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-id-4">
-                          <div className="form-field">
-                            <label htmlFor={`cc_bi_numero-${secao.id}`}>
-                              CC/BI Nº
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🪪</span>
-                              <input
-                                id={`cc_bi_numero-${secao.id}`}
-                                name="cc_bi_numero"
-                                placeholder="Número do CC/BI"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`nif-${secao.id}`}>NIF</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`nif-${secao.id}`}
-                                name="nif"
-                                placeholder="NIF"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`niss-${secao.id}`}>NISS</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`niss-${secao.id}`}
-                                name="niss"
-                                placeholder="NISS"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`numero_utente-${secao.id}`}>
-                              Nº Utente de Saúde
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">💳</span>
-                              <input
-                                id={`numero_utente-${secao.id}`}
-                                name="numero_utente"
-                                placeholder="Número de utente"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-contact">
-                          <div className="form-field">
-                            <label
-                              htmlFor={`contacto_nome_completo-${secao.id}`}
-                            >
-                              Nome do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👥</span>
-                              <input
-                                id={`contacto_nome_completo-${secao.id}`}
-                                name="contacto_nome_completo"
-                                placeholder="Quem podemos contactar?"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`contacto_telefone-${secao.id}`}>
-                              Telefone do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">☎️</span>
-                              <input
-                                id={`contacto_telefone-${secao.id}`}
-                                name="contacto_telefone"
-                                placeholder="Telefone"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-contact-2">
-                          <div className="form-field">
-                            <label htmlFor={`contacto_email-${secao.id}`}>
-                              Email do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">✉️</span>
-                              <input
-                                id={`contacto_email-${secao.id}`}
-                                name="contacto_email"
-                                type="email"
-                                placeholder="email@exemplo.pt"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`contacto_parentesco-${secao.id}`}>
-                              Grau de parentesco
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🤝</span>
-                              <input
-                                id={`contacto_parentesco-${secao.id}`}
-                                name="contacto_parentesco"
-                                placeholder="Filho, filha, irmão, etc."
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-field">
-                          <label htmlFor={`observacoes-${secao.id}`}>
-                            Observações / necessidades específicas
-                          </label>
-                          <textarea
-                            id={`observacoes-${secao.id}`}
-                            name="observacoes"
-                            rows="4"
-                            placeholder="Medicações, alergias, mobilidade, etc."
-                          />
-                        </div>
-
-                        <div className="form-actions" style={{ marginTop: 10 }}>
-                          <button type="submit" className="btn-save">
-                            Enviar inscrição ERPI
-                          </button>
-                        </div>
-                      </form>
-                    </>
-                  )}
-
-                  {selectedFormType === "creche" && (
-                    <>
-                      <h3>{selectedFormLabel || "Formulário Creche"}</h3>
-                      <form
-                        className="creche-form"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
-
-                          const selectedCrecheInput = form.querySelector(
-                            'input[name="creche_item_id"]:checked',
-                          );
-                          const creche_item_id_value =
-                            selectedCrecheInput?.value &&
-                            selectedCrecheInput.value !== "ambas"
-                              ? selectedCrecheInput.value
-                              : "";
-                          const creche_opcao_label =
-                            selectedCrecheInput?.dataset.label ||
-                            selectedCrecheInput?.value ||
-                            "";
-
-                          const crianca_nasceu =
-                            form.crianca_nasceu.value === "sim";
-
-                          const data = {
-                            creche_opcao: creche_opcao_label,
-                            creche_item_id: creche_item_id_value,
-                            nome_completo: form.nome_completo.value,
-                            morada: form.morada.value,
-                            codigo_postal: form.codigo_postal.value,
-                            localidade: form.localidade.value,
-                            crianca_nasceu,
-                            data_nascimento: crianca_nasceu
-                              ? form.data_nascimento.value
-                              : "",
-                            data_prevista: !crianca_nasceu
-                              ? form.data_prevista.value
-                              : "",
-                            cc_bi_numero: form.cc_bi_numero.value,
-                            nif: form.nif.value,
-                            niss: form.niss.value,
-                            numero_utente: form.numero_utente.value,
-                            mae_nome: form.mae_nome.value,
-                            mae_profissao: form.mae_profissao.value,
-                            mae_local_emprego: form.mae_local_emprego.value,
-                            mae_morada: form.mae_morada.value,
-                            mae_codigo_postal: form.mae_codigo_postal.value,
-                            mae_localidade: form.mae_localidade.value,
-                            mae_telemovel: form.mae_telemovel.value,
-                            mae_email: form.mae_email.value,
-                            pai_nome: form.pai_nome.value,
-                            pai_profissao: form.pai_profissao.value,
-                            pai_local_emprego: form.pai_local_emprego.value,
-                            pai_morada: form.pai_morada.value,
-                            pai_codigo_postal: form.pai_codigo_postal.value,
-                            pai_localidade: form.pai_localidade.value,
-                            pai_telemovel: form.pai_telemovel.value,
-                            pai_email: form.pai_email.value,
-                            irmaos_frequentam:
-                              form.irmaos_frequentam.value === "sim",
-                            necessita_apoio:
-                              form.necessita_apoio.value === "sim",
-                            apoio_especificacao: form.apoio_especificacao.value,
-                            origem_submissao: "site-secao-personalizada",
-                            secao_personalizada_id: secao.id,
-                            formulario_escolhido:
-                              selectedFormLabel || selectedFormType,
-                          };
-
-                          if (
-                            !data.nome_completo ||
-                            !data.morada ||
-                            !data.codigo_postal ||
-                            !data.localidade
-                          ) {
-                            alert("Preencha os campos obrigatórios.");
-                            return;
-                          }
-
-                          if (crianca_nasceu && !data.data_nascimento) {
-                            alert("Indique a data de nascimento.");
-                            return;
-                          }
-                          if (!crianca_nasceu && !data.data_prevista) {
-                            alert("Indique a data prevista.");
-                            return;
-                          }
-
-                          try {
-                            const resp = await api.post("/forms/creche", data);
-                            if (resp.data?.success) {
-                              alert(
-                                "Inscrição Creche enviada. Entraremos em contacto.",
-                              );
-                              form.reset();
-                            } else {
-                              alert("Erro ao enviar inscrição.");
-                            }
-                          } catch (err) {
-                            console.error(err);
-                            alert("Erro ao enviar inscrição.");
-                          }
-                        }}
-                      >
-                        <div className="form-field">
-                          <label>Escolha a creche</label>
                           <div
-                            className="form-selector-options"
-                            style={{ marginTop: 4 }}
+                            className="form-actions"
+                            style={{ marginTop: 10 }}
                           >
-                            {crecheOptionsWithAmbas.map((opt, idx) => (
-                              <label
-                                key={opt.id || opt.label}
-                                className={`form-option-card ${
-                                  selectedCreche === opt.id ? "selected" : ""
-                                }`}
-                                style={{ marginBottom: 0 }}
-                              >
-                                <input
-                                  type="radio"
-                                  name="creche_item_id"
-                                  value={opt.id}
-                                  data-label={opt.label}
-                                  checked={selectedCreche === opt.id}
-                                  required
-                                  onChange={() =>
-                                    setCrecheSelecao((prev) => ({
-                                      ...prev,
-                                      [secao.id]: opt.id,
-                                    }))
-                                  }
-                                />
-                                {opt.label}
-                              </label>
-                            ))}
+                            <button type="submit" className="btn-save">
+                              Enviar Mensagem
+                            </button>
                           </div>
-                        </div>
+                        </form>
+                      </>
+                    )}
 
-                        <div className="form-row">
-                          <div className="form-field">
-                            <fieldset>
-                              <legend>A criança já nasceu? *</legend>
-                              <div className="radio-group">
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="crianca_nasceu"
-                                    value="sim"
-                                    onChange={() => {
-                                      setCrecheNasceuState((prev) => ({
-                                        ...prev,
-                                        [secao.id]: true,
-                                      }));
-                                    }}
-                                    required
-                                  />
-                                  Sim
-                                </label>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="crianca_nasceu"
-                                    value="nao"
-                                    onChange={() => {
-                                      setCrecheNasceuState((prev) => ({
-                                        ...prev,
-                                        [secao.id]: false,
-                                      }));
-                                    }}
-                                    required
-                                  />
-                                  Não
-                                </label>
-                              </div>
-                            </fieldset>
-                          </div>
-                        </div>
+                    {selectedFormType === "erpi" && (
+                      <>
+                        <h3>{selectedFormLabel || "Formulário ERPI"}</h3>
+                        <form
+                          className="erpi-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.currentTarget;
+                            const data = {
+                              nome_completo: form.nome_completo.value,
+                              data_nascimento: form.data_nascimento.value,
+                              morada_completa: form.morada_completa.value,
+                              codigo_postal: form.codigo_postal.value,
+                              concelho: form.concelho.value,
+                              distrito: form.distrito.value,
+                              cc_bi_numero: form.cc_bi_numero.value,
+                              nif: form.nif.value,
+                              niss: form.niss.value,
+                              numero_utente: form.numero_utente.value,
+                              contacto_nome_completo:
+                                form.contacto_nome_completo.value,
+                              contacto_telefone: form.contacto_telefone.value,
+                              contacto_email: form.contacto_email.value,
+                              contacto_parentesco:
+                                form.contacto_parentesco.value,
+                              observacoes: form.observacoes.value,
+                              origem_submissao: "site-secao-personalizada",
+                              secao_personalizada_id: secao.id,
+                              formulario_escolhido:
+                                selectedFormLabel || selectedFormType,
+                            };
 
-                        <div className="form-row row-name-birth">
-                          <div className="form-field name-field">
-                            <label htmlFor={`creche-nome-${secao.id}`}>
-                              Nome completo da criança *
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👶</span>
-                              <input
-                                id={`creche-nome-${secao.id}`}
-                                name="nome_completo"
-                                required
-                                placeholder="Nome completo"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-data-${secao.id}`}>
-                              {crecheNasceuState[secao.id]
-                                ? "Data de nascimento *"
-                                : "Data prevista *"}
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">📅</span>
-                              <input
-                                id={`creche-data-${secao.id}`}
-                                type="date"
-                                name={
-                                  crecheNasceuState[secao.id]
-                                    ? "data_nascimento"
-                                    : "data_prevista"
-                                }
-                                min={DATE_MIN}
-                                max={
-                                  crecheNasceuState[secao.id]
-                                    ? DATE_MAX
-                                    : DATE_FUTURE_MAX
-                                }
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
+                            if (
+                              !data.nome_completo ||
+                              !data.data_nascimento ||
+                              !data.morada_completa ||
+                              !data.codigo_postal ||
+                              !data.concelho ||
+                              !data.distrito ||
+                              !data.cc_bi_numero ||
+                              !data.nif ||
+                              !data.niss ||
+                              !data.numero_utente ||
+                              !data.contacto_nome_completo ||
+                              !data.contacto_telefone ||
+                              !data.contacto_email ||
+                              !data.contacto_parentesco
+                            ) {
+                              alert("Preencha todos os campos obrigatórios.");
+                              return;
+                            }
 
-                        <div className="form-row row-address-3">
-                          <div className="form-field">
-                            <label htmlFor={`creche-morada-${secao.id}`}>
-                              Morada *
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏠</span>
-                              <input
-                                id={`creche-morada-${secao.id}`}
-                                name="morada"
-                                required
-                                placeholder="Rua, nº, andar"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-localidade-${secao.id}`}>
-                              Localidade *
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏘️</span>
-                              <input
-                                id={`creche-localidade-${secao.id}`}
-                                name="localidade"
-                                required
-                                placeholder="Localidade"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-cp-${secao.id}`}>
-                              Código Postal *
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏷️</span>
-                              <input
-                                id={`creche-cp-${secao.id}`}
-                                name="codigo_postal"
-                                required
-                                placeholder="0000-000"
-                                pattern={POSTAL_PATTERN}
-                                title={POSTAL_TITLE}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-field">
-                            <label htmlFor={`creche-cc-${secao.id}`}>
-                              CC/BI
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🪪</span>
-                              <input
-                                id={`creche-cc-${secao.id}`}
-                                name="cc_bi_numero"
-                                placeholder="Número CC/BI"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-nif-${secao.id}`}>
-                              NIF
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`creche-nif-${secao.id}`}
-                                name="nif"
-                                placeholder="NIF"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-niss-${secao.id}`}>
-                              NISS
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`creche-niss-${secao.id}`}
-                                name="niss"
-                                placeholder="NISS"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-utente-${secao.id}`}>
-                              Nº Utente
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">💳</span>
-                              <input
-                                id={`creche-utente-${secao.id}`}
-                                name="numero_utente"
-                                placeholder="Número de utente"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <h4>Filiação</h4>
-                        <div className="form-row">
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-nome-${secao.id}`}>
-                              Nome da Mãe
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👩</span>
-                              <input
-                                id={`creche-mae-nome-${secao.id}`}
-                                name="mae_nome"
-                                placeholder="Nome da mãe"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="form-row row-parent-work">
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-prof-${secao.id}`}>
-                              Profissão
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🧑‍💼</span>
-                              <input
-                                id={`creche-mae-prof-${secao.id}`}
-                                name="mae_profissao"
-                                placeholder="Profissão"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-emp-${secao.id}`}>
-                              Local de emprego
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏢</span>
-                              <input
-                                id={`creche-mae-emp-${secao.id}`}
-                                name="mae_local_emprego"
-                                placeholder="Local de emprego"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="form-row row-parent-address">
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-morada-${secao.id}`}>
-                              Morada
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏠</span>
-                              <input
-                                id={`creche-mae-morada-${secao.id}`}
-                                name="mae_morada"
-                                placeholder="Morada"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-local-${secao.id}`}>
-                              Localidade
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏘️</span>
-                              <input
-                                id={`creche-mae-local-${secao.id}`}
-                                name="mae_localidade"
-                                placeholder="Localidade"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-cp-${secao.id}`}>
-                              Código Postal
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏷️</span>
-                              <input
-                                id={`creche-mae-cp-${secao.id}`}
-                                name="mae_codigo_postal"
-                                placeholder="0000-000"
-                                pattern={POSTAL_PATTERN}
-                                title={POSTAL_TITLE}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="form-row row-parent-contact">
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-email-${secao.id}`}>
-                              Email
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">✉️</span>
-                              <input
-                                id={`creche-mae-email-${secao.id}`}
-                                name="mae_email"
-                                type="email"
-                                placeholder="email@exemplo.pt"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-mae-tel-${secao.id}`}>
-                              Telemóvel
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">📱</span>
-                              <input
-                                id={`creche-mae-tel-${secao.id}`}
-                                name="mae_telemovel"
-                                placeholder="Telemóvel"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-nome-${secao.id}`}>
-                              Nome do Pai
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👨</span>
-                              <input
-                                id={`creche-pai-nome-${secao.id}`}
-                                name="pai_nome"
-                                placeholder="Nome do pai"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="form-row row-parent-work">
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-prof-${secao.id}`}>
-                              Profissão do pai
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🧑‍💼</span>
-                              <input
-                                id={`creche-pai-prof-${secao.id}`}
-                                name="pai_profissao"
-                                placeholder="Profissão"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-emp-${secao.id}`}>
-                              Local de emprego do pai
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏢</span>
-                              <input
-                                id={`creche-pai-emp-${secao.id}`}
-                                name="pai_local_emprego"
-                                placeholder="Local de emprego"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="form-row row-parent-address">
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-morada-${secao.id}`}>
-                              Morada do pai
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏠</span>
-                              <input
-                                id={`creche-pai-morada-${secao.id}`}
-                                name="pai_morada"
-                                placeholder="Morada"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-local-${secao.id}`}>
-                              Localidade
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏘️</span>
-                              <input
-                                id={`creche-pai-local-${secao.id}`}
-                                name="pai_localidade"
-                                placeholder="Localidade"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-cp-${secao.id}`}>
-                              Código Postal
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏷️</span>
-                              <input
-                                id={`creche-pai-cp-${secao.id}`}
-                                name="pai_codigo_postal"
-                                placeholder="0000-000"
-                                pattern={POSTAL_PATTERN}
-                                title={POSTAL_TITLE}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="form-row row-parent-contact">
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-email-${secao.id}`}>
-                              Email
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">✉️</span>
-                              <input
-                                id={`creche-pai-email-${secao.id}`}
-                                name="pai_email"
-                                type="email"
-                                placeholder="email@exemplo.pt"
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`creche-pai-tel-${secao.id}`}>
-                              Telemóvel
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">📱</span>
-                              <input
-                                id={`creche-pai-tel-${secao.id}`}
-                                name="pai_telemovel"
-                                placeholder="Telemóvel"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-field">
-                            <fieldset>
-                              <legend>
-                                Irmãos a frequentar o estabelecimento?
-                              </legend>
-                              <div className="radio-group">
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="irmaos_frequentam"
-                                    value="sim"
-                                  />{" "}
-                                  Sim
-                                </label>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="irmaos_frequentam"
-                                    value="nao"
-                                    defaultChecked
-                                  />{" "}
-                                  Não
-                                </label>
-                              </div>
-                            </fieldset>
-                          </div>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-field">
-                            <fieldset>
-                              <legend>
-                                A criança necessita de apoio especial?
-                              </legend>
-                              <div className="radio-group">
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="necessita_apoio"
-                                    value="sim"
-                                    onChange={() => {
-                                      const wrap = document.getElementById(
-                                        `apoio-wrap-${secao.id}`,
-                                      );
-                                      if (wrap) wrap.style.display = "block";
-                                    }}
-                                  />
-                                  Sim
-                                </label>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name="necessita_apoio"
-                                    value="nao"
-                                    defaultChecked
-                                    onChange={() => {
-                                      const wrap = document.getElementById(
-                                        `apoio-wrap-${secao.id}`,
-                                      );
-                                      if (wrap) wrap.style.display = "none";
-                                    }}
-                                  />
-                                  Não
-                                </label>
-                              </div>
-                            </fieldset>
-                          </div>
-                        </div>
-
-                        <div
-                          id={`apoio-wrap-${secao.id}`}
-                          style={{ display: "none" }}
-                          className="form-field"
+                            try {
+                              const resp = await api.post("/forms/erpi", data);
+                              if (resp.data?.success) {
+                                alert(
+                                  "Inscrição ERPI enviada. Entraremos em contacto.",
+                                );
+                                form.reset();
+                              } else {
+                                alert("Erro ao enviar inscrição.");
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert("Erro ao enviar inscrição.");
+                            }
+                          }}
                         >
-                          <label htmlFor={`creche-apoio-${secao.id}`}>
-                            Se sim, especifique
-                          </label>
-                          <textarea
-                            id={`creche-apoio-${secao.id}`}
-                            name="apoio_especificacao"
-                            rows="3"
-                            placeholder="Descreva o apoio necessário"
-                          />
-                        </div>
+                          <div className="form-row row-name-birth">
+                            <div className="form-field name-field">
+                              <label htmlFor={`nome_completo-${secao.id}`}>
+                                Nome completo
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👤</span>
+                                <input
+                                  id={`nome_completo-${secao.id}`}
+                                  name="nome_completo"
+                                  placeholder="Nome completo"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`data_nascimento-${secao.id}`}>
+                                Data de nascimento
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">📅</span>
+                                <input
+                                  id={`data_nascimento-${secao.id}`}
+                                  name="data_nascimento"
+                                  type="date"
+                                  min={DATE_MIN}
+                                  max={DATE_MAX}
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                        <div className="form-actions" style={{ marginTop: 10 }}>
-                          <button type="submit" className="btn-save">
-                            Enviar inscrição Creche
-                          </button>
-                        </div>
-                      </form>
-                    </>
-                  )}
+                          <div className="form-row row-address">
+                            <div className="form-field">
+                              <label htmlFor={`morada_completa-${secao.id}`}>
+                                Morada completa
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏠</span>
+                                <input
+                                  id={`morada_completa-${secao.id}`}
+                                  name="morada_completa"
+                                  placeholder="Rua, nº, andar"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`codigo_postal-${secao.id}`}>
+                                Código Postal
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏷️</span>
+                                <input
+                                  id={`codigo_postal-${secao.id}`}
+                                  name="codigo_postal"
+                                  placeholder="0000-000"
+                                  pattern={POSTAL_PATTERN}
+                                  title={POSTAL_TITLE}
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                  {selectedFormType === "centro_de_dia" && (
-                    <>
-                      <h3>{selectedFormLabel || "Formulário Centro de Dia"}</h3>
-                      <form
-                        className="centro-dia-form"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
-                          const data = {
-                            nome_completo: form.nome_completo.value,
-                            data_nascimento: form.data_nascimento.value,
-                            morada_completa: form.morada_completa.value,
-                            codigo_postal: form.codigo_postal.value,
-                            concelho: form.concelho.value,
-                            distrito: form.distrito.value,
-                            cc_bi_numero: form.cc_bi_numero.value,
-                            nif: form.nif.value,
-                            niss: form.niss.value,
-                            numero_utente: form.numero_utente.value,
-                            contacto_nome_completo:
-                              form.contacto_nome_completo.value,
-                            contacto_telefone: form.contacto_telefone.value,
-                            contacto_email: form.contacto_email.value,
-                            contacto_parentesco: form.contacto_parentesco.value,
-                            observacoes: form.observacoes.value,
-                            origem_submissao: "site-secao-personalizada",
-                            secao_personalizada_id: secao.id,
-                            formulario_escolhido:
-                              selectedFormLabel || selectedFormType,
-                          };
+                          <div className="form-row row-location-2">
+                            <div className="form-field">
+                              <label htmlFor={`concelho-${secao.id}`}>
+                                Concelho
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏘️</span>
+                                <input
+                                  id={`concelho-${secao.id}`}
+                                  name="concelho"
+                                  placeholder="Concelho"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`distrito-${secao.id}`}>
+                                Distrito
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🗺️</span>
+                                <input
+                                  id={`distrito-${secao.id}`}
+                                  name="distrito"
+                                  placeholder="Distrito"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                          if (
-                            !data.nome_completo ||
-                            !data.data_nascimento ||
-                            !data.morada_completa ||
-                            !data.codigo_postal ||
-                            !data.concelho ||
-                            !data.distrito ||
-                            !data.cc_bi_numero ||
-                            !data.nif ||
-                            !data.niss ||
-                            !data.numero_utente ||
-                            !data.contacto_nome_completo ||
-                            !data.contacto_telefone ||
-                            !data.contacto_email ||
-                            !data.contacto_parentesco
-                          ) {
-                            alert("Preencha todos os campos obrigatórios.");
-                            return;
-                          }
+                          <div className="form-row row-id-4">
+                            <div className="form-field">
+                              <label htmlFor={`cc_bi_numero-${secao.id}`}>
+                                CC/BI Nº
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🪪</span>
+                                <input
+                                  id={`cc_bi_numero-${secao.id}`}
+                                  name="cc_bi_numero"
+                                  placeholder="Número do CC/BI"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`nif-${secao.id}`}>NIF</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`nif-${secao.id}`}
+                                  name="nif"
+                                  placeholder="NIF"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`niss-${secao.id}`}>NISS</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`niss-${secao.id}`}
+                                  name="niss"
+                                  placeholder="NISS"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`numero_utente-${secao.id}`}>
+                                Nº Utente de Saúde
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">💳</span>
+                                <input
+                                  id={`numero_utente-${secao.id}`}
+                                  name="numero_utente"
+                                  placeholder="Número de utente"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                          setCrecheSelecao((prev) => ({
-                            ...prev,
-                            [secao.id]:
-                              crecheOptionsWithAmbas[0]?.id || "ambas",
-                          }));
-                          setCrecheNasceuState((prev) => ({
-                            ...prev,
-                            [secao.id]: undefined,
-                          }));
-                          try {
-                            const resp = await api.post(
-                              "/forms/centro-de-dia",
-                              data,
+                          <div className="form-row row-contact">
+                            <div className="form-field">
+                              <label
+                                htmlFor={`contacto_nome_completo-${secao.id}`}
+                              >
+                                Nome do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👥</span>
+                                <input
+                                  id={`contacto_nome_completo-${secao.id}`}
+                                  name="contacto_nome_completo"
+                                  placeholder="Quem podemos contactar?"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`contacto_telefone-${secao.id}`}>
+                                Telefone do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">☎️</span>
+                                <input
+                                  id={`contacto_telefone-${secao.id}`}
+                                  name="contacto_telefone"
+                                  placeholder="Telefone"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-row row-contact-2">
+                            <div className="form-field">
+                              <label htmlFor={`contacto_email-${secao.id}`}>
+                                Email do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">✉️</span>
+                                <input
+                                  id={`contacto_email-${secao.id}`}
+                                  name="contacto_email"
+                                  type="email"
+                                  placeholder="email@exemplo.pt"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label
+                                htmlFor={`contacto_parentesco-${secao.id}`}
+                              >
+                                Grau de parentesco
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🤝</span>
+                                <input
+                                  id={`contacto_parentesco-${secao.id}`}
+                                  name="contacto_parentesco"
+                                  placeholder="Filho, filha, irmão, etc."
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-field">
+                            <label htmlFor={`observacoes-${secao.id}`}>
+                              Observações / necessidades específicas
+                            </label>
+                            <textarea
+                              id={`observacoes-${secao.id}`}
+                              name="observacoes"
+                              rows="4"
+                              placeholder="Medicações, alergias, mobilidade, etc."
+                            />
+                          </div>
+
+                          <div
+                            className="form-actions"
+                            style={{ marginTop: 10 }}
+                          >
+                            <button type="submit" className="btn-save">
+                              Enviar inscrição ERPI
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    )}
+
+                    {selectedFormType === "creche" && (
+                      <>
+                        <h3>{selectedFormLabel || "Formulário Creche"}</h3>
+                        <form
+                          className="creche-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.currentTarget;
+
+                            const selectedCrecheInput = form.querySelector(
+                              'input[name="creche_item_id"]:checked',
                             );
-                            if (resp.data?.success) {
-                              alert(
-                                "Inscrição Centro de Dia enviada. Entraremos em contacto.",
+                            const creche_item_id_value =
+                              selectedCrecheInput?.value &&
+                              selectedCrecheInput.value !== "ambas"
+                                ? selectedCrecheInput.value
+                                : "";
+                            const creche_opcao_label =
+                              selectedCrecheInput?.dataset.label ||
+                              selectedCrecheInput?.value ||
+                              "";
+
+                            const crianca_nasceu =
+                              form.crianca_nasceu.value === "sim";
+
+                            const data = {
+                              creche_opcao: creche_opcao_label,
+                              creche_item_id: creche_item_id_value,
+                              nome_completo: form.nome_completo.value,
+                              morada: form.morada.value,
+                              codigo_postal: form.codigo_postal.value,
+                              localidade: form.localidade.value,
+                              crianca_nasceu,
+                              data_nascimento: crianca_nasceu
+                                ? form.data_nascimento.value
+                                : "",
+                              data_prevista: !crianca_nasceu
+                                ? form.data_prevista.value
+                                : "",
+                              cc_bi_numero: form.cc_bi_numero.value,
+                              nif: form.nif.value,
+                              niss: form.niss.value,
+                              numero_utente: form.numero_utente.value,
+                              mae_nome: form.mae_nome.value,
+                              mae_profissao: form.mae_profissao.value,
+                              mae_local_emprego: form.mae_local_emprego.value,
+                              mae_morada: form.mae_morada.value,
+                              mae_codigo_postal: form.mae_codigo_postal.value,
+                              mae_localidade: form.mae_localidade.value,
+                              mae_telemovel: form.mae_telemovel.value,
+                              mae_email: form.mae_email.value,
+                              pai_nome: form.pai_nome.value,
+                              pai_profissao: form.pai_profissao.value,
+                              pai_local_emprego: form.pai_local_emprego.value,
+                              pai_morada: form.pai_morada.value,
+                              pai_codigo_postal: form.pai_codigo_postal.value,
+                              pai_localidade: form.pai_localidade.value,
+                              pai_telemovel: form.pai_telemovel.value,
+                              pai_email: form.pai_email.value,
+                              irmaos_frequentam:
+                                form.irmaos_frequentam.value === "sim",
+                              necessita_apoio:
+                                form.necessita_apoio.value === "sim",
+                              apoio_especificacao:
+                                form.apoio_especificacao.value,
+                              origem_submissao: "site-secao-personalizada",
+                              secao_personalizada_id: secao.id,
+                              formulario_escolhido:
+                                selectedFormLabel || selectedFormType,
+                            };
+
+                            if (
+                              !data.nome_completo ||
+                              !data.morada ||
+                              !data.codigo_postal ||
+                              !data.localidade
+                            ) {
+                              alert("Preencha os campos obrigatórios.");
+                              return;
+                            }
+
+                            if (crianca_nasceu && !data.data_nascimento) {
+                              alert("Indique a data de nascimento.");
+                              return;
+                            }
+                            if (!crianca_nasceu && !data.data_prevista) {
+                              alert("Indique a data prevista.");
+                              return;
+                            }
+
+                            try {
+                              const resp = await api.post(
+                                "/forms/creche",
+                                data,
                               );
-                              form.reset();
-                            } else {
+                              if (resp.data?.success) {
+                                alert(
+                                  "Inscrição Creche enviada. Entraremos em contacto.",
+                                );
+                                form.reset();
+                              } else {
+                                alert("Erro ao enviar inscrição.");
+                              }
+                            } catch (err) {
+                              console.error(err);
                               alert("Erro ao enviar inscrição.");
                             }
-                          } catch (err) {
-                            console.error(err);
-                            alert("Erro ao enviar inscrição.");
-                          }
-                        }}
-                      >
-                        <div className="form-row row-name-birth">
-                          <div className="form-field name-field">
-                            <label htmlFor={`nome_completo-${secao.id}`}>
-                              Nome completo
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👤</span>
-                              <input
-                                id={`nome_completo-${secao.id}`}
-                                name="nome_completo"
-                                placeholder="Nome completo"
-                                required
-                              />
-                            </div>
-                          </div>
+                          }}
+                        >
                           <div className="form-field">
-                            <label htmlFor={`data_nascimento-${secao.id}`}>
-                              Data de nascimento
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">📅</span>
-                              <input
-                                id={`data_nascimento-${secao.id}`}
-                                name="data_nascimento"
-                                type="date"
-                                min={DATE_MIN}
-                                max={DATE_MAX}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-address">
-                          <div className="form-field">
-                            <label htmlFor={`morada_completa-${secao.id}`}>
-                              Morada completa
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏠</span>
-                              <input
-                                id={`morada_completa-${secao.id}`}
-                                name="morada_completa"
-                                placeholder="Rua, nº, andar"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`codigo_postal-${secao.id}`}>
-                              Código Postal
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏷️</span>
-                              <input
-                                id={`codigo_postal-${secao.id}`}
-                                name="codigo_postal"
-                                placeholder="0000-000"
-                                pattern={POSTAL_PATTERN}
-                                title={POSTAL_TITLE}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-location-2">
-                          <div className="form-field">
-                            <label htmlFor={`concelho-${secao.id}`}>
-                              Concelho
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏘️</span>
-                              <input
-                                id={`concelho-${secao.id}`}
-                                name="concelho"
-                                placeholder="Concelho"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`distrito-${secao.id}`}>
-                              Distrito
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🗺️</span>
-                              <input
-                                id={`distrito-${secao.id}`}
-                                name="distrito"
-                                placeholder="Distrito"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-id-4">
-                          <div className="form-field">
-                            <label htmlFor={`cc_bi_numero-${secao.id}`}>
-                              CC/BI Nº
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🪪</span>
-                              <input
-                                id={`cc_bi_numero-${secao.id}`}
-                                name="cc_bi_numero"
-                                placeholder="Número do CC/BI"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`nif-${secao.id}`}>NIF</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`nif-${secao.id}`}
-                                name="nif"
-                                placeholder="NIF"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`niss-${secao.id}`}>NISS</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`niss-${secao.id}`}
-                                name="niss"
-                                placeholder="NISS"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`numero_utente-${secao.id}`}>
-                              Nº Utente de Saúde
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">💳</span>
-                              <input
-                                id={`numero_utente-${secao.id}`}
-                                name="numero_utente"
-                                placeholder="Número de utente"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="form-row row-contact">
-                          <div className="form-field">
-                            <label
-                              htmlFor={`contacto_nome_completo-${secao.id}`}
+                            <label>Escolha a creche</label>
+                            <div
+                              className="form-selector-options"
+                              style={{ marginTop: 4 }}
                             >
-                              Nome do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👥</span>
-                              <input
-                                id={`contacto_nome_completo-${secao.id}`}
-                                name="contacto_nome_completo"
-                                placeholder="Quem podemos contactar?"
-                                required
-                              />
+                              {crecheOptionsWithAmbas.map((opt, idx) => (
+                                <label
+                                  key={opt.id || opt.label}
+                                  className={`form-option-card ${
+                                    selectedCreche === opt.id ? "selected" : ""
+                                  }`}
+                                  style={{ marginBottom: 0 }}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="creche_item_id"
+                                    value={opt.id}
+                                    data-label={opt.label}
+                                    checked={selectedCreche === opt.id}
+                                    required
+                                    onChange={() =>
+                                      setCrecheSelecao((prev) => ({
+                                        ...prev,
+                                        [secao.id]: opt.id,
+                                      }))
+                                    }
+                                  />
+                                  {opt.label}
+                                </label>
+                              ))}
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`contacto_telefone-${secao.id}`}>
-                              Telefone do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">☎️</span>
-                              <input
-                                id={`contacto_telefone-${secao.id}`}
-                                name="contacto_telefone"
-                                placeholder="Telefone"
-                                required
-                              />
+
+                          <div className="form-row">
+                            <div className="form-field">
+                              <fieldset>
+                                <legend>A criança já nasceu? *</legend>
+                                <div className="radio-group">
+                                  <label>
+                                    <input
+                                      type="radio"
+                                      name="crianca_nasceu"
+                                      value="sim"
+                                      onChange={() => {
+                                        setCrecheNasceuState((prev) => ({
+                                          ...prev,
+                                          [secao.id]: true,
+                                        }));
+                                      }}
+                                      required
+                                    />
+                                    Sim
+                                  </label>
+                                  <label>
+                                    <input
+                                      type="radio"
+                                      name="crianca_nasceu"
+                                      value="nao"
+                                      onChange={() => {
+                                        setCrecheNasceuState((prev) => ({
+                                          ...prev,
+                                          [secao.id]: false,
+                                        }));
+                                      }}
+                                      required
+                                    />
+                                    Não
+                                  </label>
+                                </div>
+                              </fieldset>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="form-row row-contact-2">
-                          <div className="form-field">
-                            <label htmlFor={`contacto_email-${secao.id}`}>
-                              Email do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">✉️</span>
-                              <input
-                                id={`contacto_email-${secao.id}`}
-                                name="contacto_email"
-                                type="email"
-                                placeholder="email@exemplo.pt"
-                                required
-                              />
+                          <div className="form-row row-name-birth">
+                            <div className="form-field name-field">
+                              <label htmlFor={`creche-nome-${secao.id}`}>
+                                Nome completo da criança *
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👶</span>
+                                <input
+                                  id={`creche-nome-${secao.id}`}
+                                  name="nome_completo"
+                                  required
+                                  placeholder="Nome completo"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-data-${secao.id}`}>
+                                {crecheNasceuState[secao.id]
+                                  ? "Data de nascimento *"
+                                  : "Data prevista *"}
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">📅</span>
+                                <input
+                                  id={`creche-data-${secao.id}`}
+                                  type="date"
+                                  name={
+                                    crecheNasceuState[secao.id]
+                                      ? "data_nascimento"
+                                      : "data_prevista"
+                                  }
+                                  min={DATE_MIN}
+                                  max={
+                                    crecheNasceuState[secao.id]
+                                      ? DATE_MAX
+                                      : DATE_FUTURE_MAX
+                                  }
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`contacto_parentesco-${secao.id}`}>
-                              Grau de parentesco
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🤝</span>
-                              <input
-                                id={`contacto_parentesco-${secao.id}`}
-                                name="contacto_parentesco"
-                                placeholder="Filho, filha, irmão, etc."
-                                required
-                              />
+
+                          <div className="form-row row-address-3">
+                            <div className="form-field">
+                              <label htmlFor={`creche-morada-${secao.id}`}>
+                                Morada *
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏠</span>
+                                <input
+                                  id={`creche-morada-${secao.id}`}
+                                  name="morada"
+                                  required
+                                  placeholder="Rua, nº, andar"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-localidade-${secao.id}`}>
+                                Localidade *
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏘️</span>
+                                <input
+                                  id={`creche-localidade-${secao.id}`}
+                                  name="localidade"
+                                  required
+                                  placeholder="Localidade"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-cp-${secao.id}`}>
+                                Código Postal *
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏷️</span>
+                                <input
+                                  id={`creche-cp-${secao.id}`}
+                                  name="codigo_postal"
+                                  required
+                                  placeholder="0000-000"
+                                  pattern={POSTAL_PATTERN}
+                                  title={POSTAL_TITLE}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="form-field">
-                          <label htmlFor={`observacoes-${secao.id}`}>
-                            Observações / necessidades específicas
-                          </label>
-                          <textarea
-                            id={`observacoes-${secao.id}`}
-                            name="observacoes"
-                            rows="4"
-                            placeholder="Medicações, alergias, mobilidade, etc."
-                          />
-                        </div>
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`creche-cc-${secao.id}`}>
+                                CC/BI
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🪪</span>
+                                <input
+                                  id={`creche-cc-${secao.id}`}
+                                  name="cc_bi_numero"
+                                  placeholder="Número CC/BI"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-nif-${secao.id}`}>
+                                NIF
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`creche-nif-${secao.id}`}
+                                  name="nif"
+                                  placeholder="NIF"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-niss-${secao.id}`}>
+                                NISS
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`creche-niss-${secao.id}`}
+                                  name="niss"
+                                  placeholder="NISS"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-utente-${secao.id}`}>
+                                Nº Utente
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">💳</span>
+                                <input
+                                  id={`creche-utente-${secao.id}`}
+                                  name="numero_utente"
+                                  placeholder="Número de utente"
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                        <div className="form-actions" style={{ marginTop: 10 }}>
-                          <button type="submit" className="btn-save">
-                            Enviar inscrição Centro de Dia
-                          </button>
-                        </div>
-                      </form>
-                    </>
-                  )}
+                          <h4>Filiação</h4>
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-nome-${secao.id}`}>
+                                Nome da Mãe
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👩</span>
+                                <input
+                                  id={`creche-mae-nome-${secao.id}`}
+                                  name="mae_nome"
+                                  placeholder="Nome da mãe"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="form-row row-parent-work">
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-prof-${secao.id}`}>
+                                Profissão
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🧑‍💼</span>
+                                <input
+                                  id={`creche-mae-prof-${secao.id}`}
+                                  name="mae_profissao"
+                                  placeholder="Profissão"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-emp-${secao.id}`}>
+                                Local de emprego
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏢</span>
+                                <input
+                                  id={`creche-mae-emp-${secao.id}`}
+                                  name="mae_local_emprego"
+                                  placeholder="Local de emprego"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="form-row row-parent-address">
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-morada-${secao.id}`}>
+                                Morada
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏠</span>
+                                <input
+                                  id={`creche-mae-morada-${secao.id}`}
+                                  name="mae_morada"
+                                  placeholder="Morada"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-local-${secao.id}`}>
+                                Localidade
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏘️</span>
+                                <input
+                                  id={`creche-mae-local-${secao.id}`}
+                                  name="mae_localidade"
+                                  placeholder="Localidade"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-cp-${secao.id}`}>
+                                Código Postal
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏷️</span>
+                                <input
+                                  id={`creche-mae-cp-${secao.id}`}
+                                  name="mae_codigo_postal"
+                                  placeholder="0000-000"
+                                  pattern={POSTAL_PATTERN}
+                                  title={POSTAL_TITLE}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="form-row row-parent-contact">
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-email-${secao.id}`}>
+                                Email
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">✉️</span>
+                                <input
+                                  id={`creche-mae-email-${secao.id}`}
+                                  name="mae_email"
+                                  type="email"
+                                  placeholder="email@exemplo.pt"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-mae-tel-${secao.id}`}>
+                                Telemóvel
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">📱</span>
+                                <input
+                                  id={`creche-mae-tel-${secao.id}`}
+                                  name="mae_telemovel"
+                                  placeholder="Telemóvel"
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                  {selectedFormType === "sad" && (
-                    <>
-                      <h3>{selectedFormLabel || "Formulário SAD"}</h3>
-                      <form
-                        className="sad-form"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const form = e.currentTarget;
+                          <div className="form-row">
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-nome-${secao.id}`}>
+                                Nome do Pai
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👨</span>
+                                <input
+                                  id={`creche-pai-nome-${secao.id}`}
+                                  name="pai_nome"
+                                  placeholder="Nome do pai"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="form-row row-parent-work">
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-prof-${secao.id}`}>
+                                Profissão do pai
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🧑‍💼</span>
+                                <input
+                                  id={`creche-pai-prof-${secao.id}`}
+                                  name="pai_profissao"
+                                  placeholder="Profissão"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-emp-${secao.id}`}>
+                                Local de emprego do pai
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏢</span>
+                                <input
+                                  id={`creche-pai-emp-${secao.id}`}
+                                  name="pai_local_emprego"
+                                  placeholder="Local de emprego"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="form-row row-parent-address">
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-morada-${secao.id}`}>
+                                Morada do pai
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏠</span>
+                                <input
+                                  id={`creche-pai-morada-${secao.id}`}
+                                  name="pai_morada"
+                                  placeholder="Morada"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-local-${secao.id}`}>
+                                Localidade
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏘️</span>
+                                <input
+                                  id={`creche-pai-local-${secao.id}`}
+                                  name="pai_localidade"
+                                  placeholder="Localidade"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-cp-${secao.id}`}>
+                                Código Postal
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏷️</span>
+                                <input
+                                  id={`creche-pai-cp-${secao.id}`}
+                                  name="pai_codigo_postal"
+                                  placeholder="0000-000"
+                                  pattern={POSTAL_PATTERN}
+                                  title={POSTAL_TITLE}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="form-row row-parent-contact">
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-email-${secao.id}`}>
+                                Email
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">✉️</span>
+                                <input
+                                  id={`creche-pai-email-${secao.id}`}
+                                  name="pai_email"
+                                  type="email"
+                                  placeholder="email@exemplo.pt"
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`creche-pai-tel-${secao.id}`}>
+                                Telemóvel
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">📱</span>
+                                <input
+                                  id={`creche-pai-tel-${secao.id}`}
+                                  name="pai_telemovel"
+                                  placeholder="Telemóvel"
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                          const data = {
-                            nome_completo: form.nome_completo.value,
-                            data_nascimento: form.data_nascimento.value,
-                            morada_completa: form.morada_completa.value,
-                            codigo_postal: form.codigo_postal.value,
-                            concelho: form.concelho.value,
-                            distrito: form.distrito.value,
-                            cc_bi_numero: form.cc_bi_numero.value,
-                            nif: form.nif.value,
-                            niss: form.niss.value,
-                            numero_utente: form.numero_utente.value,
-                            contacto_nome_completo:
-                              form.contacto_nome_completo.value,
-                            contacto_telefone: form.contacto_telefone.value,
-                            contacto_email: form.contacto_email.value,
-                            contacto_parentesco: form.contacto_parentesco.value,
-                            observacoes: form.observacoes.value,
-                            higiene_pessoal: form.higiene_pessoal.checked,
-                            higiene_habitacional:
-                              form.higiene_habitacional.checked,
-                            refeicoes: form.refeicoes.checked,
-                            tratamento_roupa: form.tratamento_roupa.checked,
-                            periodicidade_higiene_pessoal: form.higiene_pessoal
-                              .checked
-                              ? form.periodicidade_higiene_pessoal.value
-                              : "",
-                            vezes_higiene_pessoal: form.higiene_pessoal.checked
-                              ? form.vezes_higiene_pessoal.value
-                              : "",
-                            periodicidade_higiene_habitacional: form
-                              .higiene_habitacional.checked
-                              ? form.periodicidade_higiene_habitacional.value
-                              : "",
-                            vezes_higiene_habitacional: form
-                              .higiene_habitacional.checked
-                              ? form.vezes_higiene_habitacional.value
-                              : "",
-                            periodicidade_refeicoes: form.refeicoes.checked
-                              ? form.periodicidade_refeicoes.value
-                              : "",
-                            vezes_refeicoes: form.refeicoes.checked
-                              ? form.vezes_refeicoes.value
-                              : "",
-                            periodicidade_tratamento_roupa: form
-                              .tratamento_roupa.checked
-                              ? form.periodicidade_tratamento_roupa.value
-                              : "",
-                            vezes_tratamento_roupa: form.tratamento_roupa
-                              .checked
-                              ? form.vezes_tratamento_roupa.value
-                              : "",
-                            origem_submissao: "site-secao-personalizada",
-                            secao_personalizada_id: secao.id,
-                            formulario_escolhido:
-                              selectedFormLabel || selectedFormType,
-                          };
+                          <div className="form-row">
+                            <div className="form-field">
+                              <fieldset>
+                                <legend>
+                                  Irmãos a frequentar o estabelecimento?
+                                </legend>
+                                <div className="radio-group">
+                                  <label>
+                                    <input
+                                      type="radio"
+                                      name="irmaos_frequentam"
+                                      value="sim"
+                                    />{" "}
+                                    Sim
+                                  </label>
+                                  <label>
+                                    <input
+                                      type="radio"
+                                      name="irmaos_frequentam"
+                                      value="nao"
+                                      defaultChecked
+                                    />{" "}
+                                    Não
+                                  </label>
+                                </div>
+                              </fieldset>
+                            </div>
+                          </div>
 
-                          if (
-                            !data.nome_completo ||
-                            !data.data_nascimento ||
-                            !data.morada_completa ||
-                            !data.codigo_postal ||
-                            !data.concelho ||
-                            !data.distrito ||
-                            !data.cc_bi_numero ||
-                            !data.nif ||
-                            !data.niss ||
-                            !data.numero_utente ||
-                            !data.contacto_nome_completo ||
-                            !data.contacto_telefone ||
-                            !data.contacto_email ||
-                            !data.contacto_parentesco
-                          ) {
-                            alert("Preencha todos os campos obrigatórios.");
-                            return;
-                          }
+                          <div className="form-row">
+                            <div className="form-field">
+                              <fieldset>
+                                <legend>
+                                  A criança necessita de apoio especial?
+                                </legend>
+                                <div className="radio-group">
+                                  <label>
+                                    <input
+                                      type="radio"
+                                      name="necessita_apoio"
+                                      value="sim"
+                                      onChange={() => {
+                                        const wrap = document.getElementById(
+                                          `apoio-wrap-${secao.id}`,
+                                        );
+                                        if (wrap) wrap.style.display = "block";
+                                      }}
+                                    />
+                                    Sim
+                                  </label>
+                                  <label>
+                                    <input
+                                      type="radio"
+                                      name="necessita_apoio"
+                                      value="nao"
+                                      defaultChecked
+                                      onChange={() => {
+                                        const wrap = document.getElementById(
+                                          `apoio-wrap-${secao.id}`,
+                                        );
+                                        if (wrap) wrap.style.display = "none";
+                                      }}
+                                    />
+                                    Não
+                                  </label>
+                                </div>
+                              </fieldset>
+                            </div>
+                          </div>
 
-                          try {
-                            const resp = await api.post("/forms/sad", data);
-                            if (resp.data?.success) {
-                              alert(
-                                "Inscrição SAD enviada. Entraremos em contacto.",
+                          <div
+                            id={`apoio-wrap-${secao.id}`}
+                            style={{ display: "none" }}
+                            className="form-field"
+                          >
+                            <label htmlFor={`creche-apoio-${secao.id}`}>
+                              Se sim, especifique
+                            </label>
+                            <textarea
+                              id={`creche-apoio-${secao.id}`}
+                              name="apoio_especificacao"
+                              rows="3"
+                              placeholder="Descreva o apoio necessário"
+                            />
+                          </div>
+
+                          <div
+                            className="form-actions"
+                            style={{ marginTop: 10 }}
+                          >
+                            <button type="submit" className="btn-save">
+                              Enviar inscrição Creche
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    )}
+
+                    {selectedFormType === "centro_de_dia" && (
+                      <>
+                        <h3>
+                          {selectedFormLabel || "Formulário Centro de Dia"}
+                        </h3>
+                        <form
+                          className="centro-dia-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.currentTarget;
+                            const data = {
+                              nome_completo: form.nome_completo.value,
+                              data_nascimento: form.data_nascimento.value,
+                              morada_completa: form.morada_completa.value,
+                              codigo_postal: form.codigo_postal.value,
+                              concelho: form.concelho.value,
+                              distrito: form.distrito.value,
+                              cc_bi_numero: form.cc_bi_numero.value,
+                              nif: form.nif.value,
+                              niss: form.niss.value,
+                              numero_utente: form.numero_utente.value,
+                              contacto_nome_completo:
+                                form.contacto_nome_completo.value,
+                              contacto_telefone: form.contacto_telefone.value,
+                              contacto_email: form.contacto_email.value,
+                              contacto_parentesco:
+                                form.contacto_parentesco.value,
+                              observacoes: form.observacoes.value,
+                              origem_submissao: "site-secao-personalizada",
+                              secao_personalizada_id: secao.id,
+                              formulario_escolhido:
+                                selectedFormLabel || selectedFormType,
+                            };
+
+                            if (
+                              !data.nome_completo ||
+                              !data.data_nascimento ||
+                              !data.morada_completa ||
+                              !data.codigo_postal ||
+                              !data.concelho ||
+                              !data.distrito ||
+                              !data.cc_bi_numero ||
+                              !data.nif ||
+                              !data.niss ||
+                              !data.numero_utente ||
+                              !data.contacto_nome_completo ||
+                              !data.contacto_telefone ||
+                              !data.contacto_email ||
+                              !data.contacto_parentesco
+                            ) {
+                              alert("Preencha todos os campos obrigatórios.");
+                              return;
+                            }
+
+                            setCrecheSelecao((prev) => ({
+                              ...prev,
+                              [secao.id]:
+                                crecheOptionsWithAmbas[0]?.id || "ambas",
+                            }));
+                            setCrecheNasceuState((prev) => ({
+                              ...prev,
+                              [secao.id]: undefined,
+                            }));
+                            try {
+                              const resp = await api.post(
+                                "/forms/centro-de-dia",
+                                data,
                               );
-                              form.reset();
-                            } else {
+                              if (resp.data?.success) {
+                                alert(
+                                  "Inscrição Centro de Dia enviada. Entraremos em contacto.",
+                                );
+                                form.reset();
+                              } else {
+                                alert("Erro ao enviar inscrição.");
+                              }
+                            } catch (err) {
+                              console.error(err);
                               alert("Erro ao enviar inscrição.");
                             }
-                          } catch (err) {
-                            console.error(err);
-                            alert("Erro ao enviar inscrição.");
-                          }
-                        }}
-                      >
-                        <div className="form-row row-name-birth">
-                          <div className="form-field name-field">
-                            <label htmlFor={`nome_completo-${secao.id}`}>
-                              Nome completo
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👤</span>
-                              <input
-                                id={`nome_completo-${secao.id}`}
-                                name="nome_completo"
-                                placeholder="Nome completo"
-                                required
-                              />
+                          }}
+                        >
+                          <div className="form-row row-name-birth">
+                            <div className="form-field name-field">
+                              <label htmlFor={`nome_completo-${secao.id}`}>
+                                Nome completo
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👤</span>
+                                <input
+                                  id={`nome_completo-${secao.id}`}
+                                  name="nome_completo"
+                                  placeholder="Nome completo"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`data_nascimento-${secao.id}`}>
+                                Data de nascimento
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">📅</span>
+                                <input
+                                  id={`data_nascimento-${secao.id}`}
+                                  name="data_nascimento"
+                                  type="date"
+                                  min={DATE_MIN}
+                                  max={DATE_MAX}
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`data_nascimento-${secao.id}`}>
-                              Data de nascimento
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">📅</span>
-                              <input
-                                id={`data_nascimento-${secao.id}`}
-                                name="data_nascimento"
-                                type="date"
-                                min={DATE_MIN}
-                                max={DATE_MAX}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-row row-address">
-                          <div className="form-field">
-                            <label htmlFor={`morada_completa-${secao.id}`}>
-                              Morada completa
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏠</span>
-                              <input
-                                id={`morada_completa-${secao.id}`}
-                                name="morada_completa"
-                                placeholder="Rua, nº, andar"
-                                required
-                              />
+                          <div className="form-row row-address">
+                            <div className="form-field">
+                              <label htmlFor={`morada_completa-${secao.id}`}>
+                                Morada completa
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏠</span>
+                                <input
+                                  id={`morada_completa-${secao.id}`}
+                                  name="morada_completa"
+                                  placeholder="Rua, nº, andar"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`codigo_postal-${secao.id}`}>
+                                Código Postal
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏷️</span>
+                                <input
+                                  id={`codigo_postal-${secao.id}`}
+                                  name="codigo_postal"
+                                  placeholder="0000-000"
+                                  pattern={POSTAL_PATTERN}
+                                  title={POSTAL_TITLE}
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`codigo_postal-${secao.id}`}>
-                              Código Postal
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏷️</span>
-                              <input
-                                id={`codigo_postal-${secao.id}`}
-                                name="codigo_postal"
-                                placeholder="0000-000"
-                                pattern={POSTAL_PATTERN}
-                                title={POSTAL_TITLE}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-row row-location-2">
-                          <div className="form-field">
-                            <label htmlFor={`concelho-${secao.id}`}>
-                              Concelho
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🏘️</span>
-                              <input
-                                id={`concelho-${secao.id}`}
-                                name="concelho"
-                                placeholder="Concelho"
-                                required
-                              />
+                          <div className="form-row row-location-2">
+                            <div className="form-field">
+                              <label htmlFor={`concelho-${secao.id}`}>
+                                Concelho
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏘️</span>
+                                <input
+                                  id={`concelho-${secao.id}`}
+                                  name="concelho"
+                                  placeholder="Concelho"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`distrito-${secao.id}`}>
+                                Distrito
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🗺️</span>
+                                <input
+                                  id={`distrito-${secao.id}`}
+                                  name="distrito"
+                                  placeholder="Distrito"
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`distrito-${secao.id}`}>
-                              Distrito
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🗺️</span>
-                              <input
-                                id={`distrito-${secao.id}`}
-                                name="distrito"
-                                placeholder="Distrito"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-row row-id-4">
-                          <div className="form-field">
-                            <label htmlFor={`cc_bi_numero-${secao.id}`}>
-                              CC/BI Nº
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🪪</span>
-                              <input
-                                id={`cc_bi_numero-${secao.id}`}
-                                name="cc_bi_numero"
-                                placeholder="Número do CC/BI"
-                                required
-                              />
+                          <div className="form-row row-id-4">
+                            <div className="form-field">
+                              <label htmlFor={`cc_bi_numero-${secao.id}`}>
+                                CC/BI Nº
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🪪</span>
+                                <input
+                                  id={`cc_bi_numero-${secao.id}`}
+                                  name="cc_bi_numero"
+                                  placeholder="Número do CC/BI"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`nif-${secao.id}`}>NIF</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`nif-${secao.id}`}
+                                  name="nif"
+                                  placeholder="NIF"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`niss-${secao.id}`}>NISS</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`niss-${secao.id}`}
+                                  name="niss"
+                                  placeholder="NISS"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`numero_utente-${secao.id}`}>
+                                Nº Utente de Saúde
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">💳</span>
+                                <input
+                                  id={`numero_utente-${secao.id}`}
+                                  name="numero_utente"
+                                  placeholder="Número de utente"
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`nif-${secao.id}`}>NIF</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`nif-${secao.id}`}
-                                name="nif"
-                                placeholder="NIF"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`niss-${secao.id}`}>NISS</label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">#</span>
-                              <input
-                                id={`niss-${secao.id}`}
-                                name="niss"
-                                placeholder="NISS"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="form-field">
-                            <label htmlFor={`numero_utente-${secao.id}`}>
-                              Nº Utente de Saúde
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">💳</span>
-                              <input
-                                id={`numero_utente-${secao.id}`}
-                                name="numero_utente"
-                                placeholder="Número de utente"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-row row-contact">
-                          <div className="form-field">
-                            <label
-                              htmlFor={`contacto_nome_completo-${secao.id}`}
-                            >
-                              Nome do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">👥</span>
-                              <input
-                                id={`contacto_nome_completo-${secao.id}`}
-                                name="contacto_nome_completo"
-                                placeholder="Quem podemos contactar?"
-                                required
-                              />
+                          <div className="form-row row-contact">
+                            <div className="form-field">
+                              <label
+                                htmlFor={`contacto_nome_completo-${secao.id}`}
+                              >
+                                Nome do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👥</span>
+                                <input
+                                  id={`contacto_nome_completo-${secao.id}`}
+                                  name="contacto_nome_completo"
+                                  placeholder="Quem podemos contactar?"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`contacto_telefone-${secao.id}`}>
+                                Telefone do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">☎️</span>
+                                <input
+                                  id={`contacto_telefone-${secao.id}`}
+                                  name="contacto_telefone"
+                                  placeholder="Telefone"
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="form-field">
-                            <label htmlFor={`contacto_telefone-${secao.id}`}>
-                              Telefone do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">☎️</span>
-                              <input
-                                id={`contacto_telefone-${secao.id}`}
-                                name="contacto_telefone"
-                                placeholder="Telefone"
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-row row-contact-2">
-                          <div className="form-field">
-                            <label htmlFor={`contacto_email-${secao.id}`}>
-                              Email do contacto
-                            </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">✉️</span>
-                              <input
-                                id={`contacto_email-${secao.id}`}
-                                name="contacto_email"
-                                type="email"
-                                placeholder="email@exemplo.pt"
-                                required
-                              />
+                          <div className="form-row row-contact-2">
+                            <div className="form-field">
+                              <label htmlFor={`contacto_email-${secao.id}`}>
+                                Email do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">✉️</span>
+                                <input
+                                  id={`contacto_email-${secao.id}`}
+                                  name="contacto_email"
+                                  type="email"
+                                  placeholder="email@exemplo.pt"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label
+                                htmlFor={`contacto_parentesco-${secao.id}`}
+                              >
+                                Grau de parentesco
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🤝</span>
+                                <input
+                                  id={`contacto_parentesco-${secao.id}`}
+                                  name="contacto_parentesco"
+                                  placeholder="Filho, filha, irmão, etc."
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
+
                           <div className="form-field">
-                            <label htmlFor={`contacto_parentesco-${secao.id}`}>
-                              Grau de parentesco
+                            <label htmlFor={`observacoes-${secao.id}`}>
+                              Observações / necessidades específicas
                             </label>
-                            <div className="input-with-icon">
-                              <span className="input-icon">🤝</span>
-                              <input
-                                id={`contacto_parentesco-${secao.id}`}
-                                name="contacto_parentesco"
-                                placeholder="Filho, filha, irmão, etc."
-                                required
-                              />
+                            <textarea
+                              id={`observacoes-${secao.id}`}
+                              name="observacoes"
+                              rows="4"
+                              placeholder="Medicações, alergias, mobilidade, etc."
+                            />
+                          </div>
+
+                          <div
+                            className="form-actions"
+                            style={{ marginTop: 10 }}
+                          >
+                            <button type="submit" className="btn-save">
+                              Enviar inscrição Centro de Dia
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    )}
+
+                    {selectedFormType === "sad" && (
+                      <>
+                        <h3>{selectedFormLabel || "Formulário SAD"}</h3>
+                        <form
+                          className="sad-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.currentTarget;
+
+                            const data = {
+                              nome_completo: form.nome_completo.value,
+                              data_nascimento: form.data_nascimento.value,
+                              morada_completa: form.morada_completa.value,
+                              codigo_postal: form.codigo_postal.value,
+                              concelho: form.concelho.value,
+                              distrito: form.distrito.value,
+                              cc_bi_numero: form.cc_bi_numero.value,
+                              nif: form.nif.value,
+                              niss: form.niss.value,
+                              numero_utente: form.numero_utente.value,
+                              contacto_nome_completo:
+                                form.contacto_nome_completo.value,
+                              contacto_telefone: form.contacto_telefone.value,
+                              contacto_email: form.contacto_email.value,
+                              contacto_parentesco:
+                                form.contacto_parentesco.value,
+                              observacoes: form.observacoes.value,
+                              higiene_pessoal: form.higiene_pessoal.checked,
+                              higiene_habitacional:
+                                form.higiene_habitacional.checked,
+                              refeicoes: form.refeicoes.checked,
+                              tratamento_roupa: form.tratamento_roupa.checked,
+                              periodicidade_higiene_pessoal: form
+                                .higiene_pessoal.checked
+                                ? form.periodicidade_higiene_pessoal.value
+                                : "",
+                              vezes_higiene_pessoal: form.higiene_pessoal
+                                .checked
+                                ? form.vezes_higiene_pessoal.value
+                                : "",
+                              periodicidade_higiene_habitacional: form
+                                .higiene_habitacional.checked
+                                ? form.periodicidade_higiene_habitacional.value
+                                : "",
+                              vezes_higiene_habitacional: form
+                                .higiene_habitacional.checked
+                                ? form.vezes_higiene_habitacional.value
+                                : "",
+                              periodicidade_refeicoes: form.refeicoes.checked
+                                ? form.periodicidade_refeicoes.value
+                                : "",
+                              vezes_refeicoes: form.refeicoes.checked
+                                ? form.vezes_refeicoes.value
+                                : "",
+                              periodicidade_tratamento_roupa: form
+                                .tratamento_roupa.checked
+                                ? form.periodicidade_tratamento_roupa.value
+                                : "",
+                              vezes_tratamento_roupa: form.tratamento_roupa
+                                .checked
+                                ? form.vezes_tratamento_roupa.value
+                                : "",
+                              origem_submissao: "site-secao-personalizada",
+                              secao_personalizada_id: secao.id,
+                              formulario_escolhido:
+                                selectedFormLabel || selectedFormType,
+                            };
+
+                            if (
+                              !data.nome_completo ||
+                              !data.data_nascimento ||
+                              !data.morada_completa ||
+                              !data.codigo_postal ||
+                              !data.concelho ||
+                              !data.distrito ||
+                              !data.cc_bi_numero ||
+                              !data.nif ||
+                              !data.niss ||
+                              !data.numero_utente ||
+                              !data.contacto_nome_completo ||
+                              !data.contacto_telefone ||
+                              !data.contacto_email ||
+                              !data.contacto_parentesco
+                            ) {
+                              alert("Preencha todos os campos obrigatórios.");
+                              return;
+                            }
+
+                            try {
+                              const resp = await api.post("/forms/sad", data);
+                              if (resp.data?.success) {
+                                alert(
+                                  "Inscrição SAD enviada. Entraremos em contacto.",
+                                );
+                                form.reset();
+                              } else {
+                                alert("Erro ao enviar inscrição.");
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert("Erro ao enviar inscrição.");
+                            }
+                          }}
+                        >
+                          <div className="form-row row-name-birth">
+                            <div className="form-field name-field">
+                              <label htmlFor={`nome_completo-${secao.id}`}>
+                                Nome completo
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👤</span>
+                                <input
+                                  id={`nome_completo-${secao.id}`}
+                                  name="nome_completo"
+                                  placeholder="Nome completo"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`data_nascimento-${secao.id}`}>
+                                Data de nascimento
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">📅</span>
+                                <input
+                                  id={`data_nascimento-${secao.id}`}
+                                  name="data_nascimento"
+                                  type="date"
+                                  min={DATE_MIN}
+                                  max={DATE_MAX}
+                                  required
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="form-field">
-                          <label htmlFor={`observacoes-${secao.id}`}>
-                            Observações / necessidades específicas
-                          </label>
-                          <textarea
-                            id={`observacoes-${secao.id}`}
-                            name="observacoes"
-                            rows="4"
-                            placeholder="Medicações, alergias, mobilidade, etc."
-                          />
-                        </div>
+                          <div className="form-row row-address">
+                            <div className="form-field">
+                              <label htmlFor={`morada_completa-${secao.id}`}>
+                                Morada completa
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏠</span>
+                                <input
+                                  id={`morada_completa-${secao.id}`}
+                                  name="morada_completa"
+                                  placeholder="Rua, nº, andar"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`codigo_postal-${secao.id}`}>
+                                Código Postal
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏷️</span>
+                                <input
+                                  id={`codigo_postal-${secao.id}`}
+                                  name="codigo_postal"
+                                  placeholder="0000-000"
+                                  pattern={POSTAL_PATTERN}
+                                  title={POSTAL_TITLE}
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
 
-                        {/* Serviços marcáveis */}
-                        <div className="form-row checkbox-row">
-                          <div className="form-field checkbox-field">
-                            <label>
-                              <input
-                                type="checkbox"
-                                name="higiene_pessoal"
-                                id={`higiene_pessoal-${secao.id}`}
-                                onChange={(e) => {
-                                  const wrap = document.getElementById(
-                                    `wrap-higiene_pessoal-${secao.id}`,
-                                  );
-                                  if (wrap)
-                                    wrap.style.display = e.target.checked
-                                      ? "block"
-                                      : "none";
-                                }}
-                              />
-                              Higiene pessoal
+                          <div className="form-row row-location-2">
+                            <div className="form-field">
+                              <label htmlFor={`concelho-${secao.id}`}>
+                                Concelho
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🏘️</span>
+                                <input
+                                  id={`concelho-${secao.id}`}
+                                  name="concelho"
+                                  placeholder="Concelho"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`distrito-${secao.id}`}>
+                                Distrito
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🗺️</span>
+                                <input
+                                  id={`distrito-${secao.id}`}
+                                  name="distrito"
+                                  placeholder="Distrito"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-row row-id-4">
+                            <div className="form-field">
+                              <label htmlFor={`cc_bi_numero-${secao.id}`}>
+                                CC/BI Nº
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🪪</span>
+                                <input
+                                  id={`cc_bi_numero-${secao.id}`}
+                                  name="cc_bi_numero"
+                                  placeholder="Número do CC/BI"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`nif-${secao.id}`}>NIF</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`nif-${secao.id}`}
+                                  name="nif"
+                                  placeholder="NIF"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`niss-${secao.id}`}>NISS</label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">#</span>
+                                <input
+                                  id={`niss-${secao.id}`}
+                                  name="niss"
+                                  placeholder="NISS"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`numero_utente-${secao.id}`}>
+                                Nº Utente de Saúde
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">💳</span>
+                                <input
+                                  id={`numero_utente-${secao.id}`}
+                                  name="numero_utente"
+                                  placeholder="Número de utente"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-row row-contact">
+                            <div className="form-field">
+                              <label
+                                htmlFor={`contacto_nome_completo-${secao.id}`}
+                              >
+                                Nome do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">👥</span>
+                                <input
+                                  id={`contacto_nome_completo-${secao.id}`}
+                                  name="contacto_nome_completo"
+                                  placeholder="Quem podemos contactar?"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label htmlFor={`contacto_telefone-${secao.id}`}>
+                                Telefone do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">☎️</span>
+                                <input
+                                  id={`contacto_telefone-${secao.id}`}
+                                  name="contacto_telefone"
+                                  placeholder="Telefone"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-row row-contact-2">
+                            <div className="form-field">
+                              <label htmlFor={`contacto_email-${secao.id}`}>
+                                Email do contacto
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">✉️</span>
+                                <input
+                                  id={`contacto_email-${secao.id}`}
+                                  name="contacto_email"
+                                  type="email"
+                                  placeholder="email@exemplo.pt"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-field">
+                              <label
+                                htmlFor={`contacto_parentesco-${secao.id}`}
+                              >
+                                Grau de parentesco
+                              </label>
+                              <div className="input-with-icon">
+                                <span className="input-icon">🤝</span>
+                                <input
+                                  id={`contacto_parentesco-${secao.id}`}
+                                  name="contacto_parentesco"
+                                  placeholder="Filho, filha, irmão, etc."
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="form-field">
+                            <label htmlFor={`observacoes-${secao.id}`}>
+                              Observações / necessidades específicas
                             </label>
-                            <div
-                              id={`wrap-higiene_pessoal-${secao.id}`}
-                              style={{ display: "none" }}
-                              className="service-config"
-                            >
-                              <div className="form-row">
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`periodicidade_higiene_pessoal-${secao.id}`}
-                                  >
-                                    Periodicidade (Higiene pessoal)
-                                  </label>
-                                  <select
-                                    id={`periodicidade_higiene_pessoal-${secao.id}`}
-                                    name="periodicidade_higiene_pessoal"
-                                    defaultValue=""
-                                  >
-                                    <option value="">Selecione</option>
-                                    <option value="segunda a sexta">
-                                      Segunda a sexta
-                                    </option>
-                                    <option value="segunda a sabado">
-                                      Segunda a sábado
-                                    </option>
-                                    <option value="segunda a domingo">
-                                      Segunda a domingo
-                                    </option>
-                                  </select>
+                            <textarea
+                              id={`observacoes-${secao.id}`}
+                              name="observacoes"
+                              rows="4"
+                              placeholder="Medicações, alergias, mobilidade, etc."
+                            />
+                          </div>
+
+                          {/* Serviços marcáveis */}
+                          <div className="form-row checkbox-row">
+                            <div className="form-field checkbox-field">
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  name="higiene_pessoal"
+                                  id={`higiene_pessoal-${secao.id}`}
+                                  onChange={(e) => {
+                                    const wrap = document.getElementById(
+                                      `wrap-higiene_pessoal-${secao.id}`,
+                                    );
+                                    if (wrap)
+                                      wrap.style.display = e.target.checked
+                                        ? "block"
+                                        : "none";
+                                  }}
+                                />
+                                Higiene pessoal
+                              </label>
+                              <div
+                                id={`wrap-higiene_pessoal-${secao.id}`}
+                                style={{ display: "none" }}
+                                className="service-config"
+                              >
+                                <div className="form-row">
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`periodicidade_higiene_pessoal-${secao.id}`}
+                                    >
+                                      Periodicidade (Higiene pessoal)
+                                    </label>
+                                    <select
+                                      id={`periodicidade_higiene_pessoal-${secao.id}`}
+                                      name="periodicidade_higiene_pessoal"
+                                      defaultValue=""
+                                    >
+                                      <option value="">Selecione</option>
+                                      <option value="segunda a sexta">
+                                        Segunda a sexta
+                                      </option>
+                                      <option value="segunda a sabado">
+                                        Segunda a sábado
+                                      </option>
+                                      <option value="segunda a domingo">
+                                        Segunda a domingo
+                                      </option>
+                                    </select>
+                                  </div>
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`vezes_higiene_pessoal-${secao.id}`}
+                                    >
+                                      Vezes por dia (Higiene pessoal)
+                                    </label>
+                                    <input
+                                      id={`vezes_higiene_pessoal-${secao.id}`}
+                                      name="vezes_higiene_pessoal"
+                                      type="number"
+                                      min="1"
+                                      max="5"
+                                      placeholder="1-5"
+                                    />
+                                  </div>
                                 </div>
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`vezes_higiene_pessoal-${secao.id}`}
-                                  >
-                                    Vezes por dia (Higiene pessoal)
-                                  </label>
-                                  <input
-                                    id={`vezes_higiene_pessoal-${secao.id}`}
-                                    name="vezes_higiene_pessoal"
-                                    type="number"
-                                    min="1"
-                                    max="5"
-                                    placeholder="1-5"
-                                  />
+                              </div>
+                            </div>
+                            <div className="form-field checkbox-field">
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  name="higiene_habitacional"
+                                  id={`higiene_habitacional-${secao.id}`}
+                                  onChange={(e) => {
+                                    const wrap = document.getElementById(
+                                      `wrap-higiene_habitacional-${secao.id}`,
+                                    );
+                                    if (wrap)
+                                      wrap.style.display = e.target.checked
+                                        ? "block"
+                                        : "none";
+                                  }}
+                                />
+                                Higiene habitacional
+                              </label>
+                              <div
+                                id={`wrap-higiene_habitacional-${secao.id}`}
+                                style={{ display: "none" }}
+                                className="service-config"
+                              >
+                                <div className="form-row">
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`periodicidade_higiene_habitacional-${secao.id}`}
+                                    >
+                                      Periodicidade (Higiene habitacional)
+                                    </label>
+                                    <select
+                                      id={`periodicidade_higiene_habitacional-${secao.id}`}
+                                      name="periodicidade_higiene_habitacional"
+                                      defaultValue=""
+                                    >
+                                      <option value="">Selecione</option>
+                                      <option value="segunda a sexta">
+                                        Segunda a sexta
+                                      </option>
+                                      <option value="segunda a sabado">
+                                        Segunda a sábado
+                                      </option>
+                                      <option value="segunda a domingo">
+                                        Segunda a domingo
+                                      </option>
+                                    </select>
+                                  </div>
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`vezes_higiene_habitacional-${secao.id}`}
+                                    >
+                                      Vezes por dia (Higiene habitacional)
+                                    </label>
+                                    <input
+                                      id={`vezes_higiene_habitacional-${secao.id}`}
+                                      name="vezes_higiene_habitacional"
+                                      type="number"
+                                      min="1"
+                                      max="5"
+                                      placeholder="1-5"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
-                          <div className="form-field checkbox-field">
-                            <label>
-                              <input
-                                type="checkbox"
-                                name="higiene_habitacional"
-                                id={`higiene_habitacional-${secao.id}`}
-                                onChange={(e) => {
-                                  const wrap = document.getElementById(
-                                    `wrap-higiene_habitacional-${secao.id}`,
-                                  );
-                                  if (wrap)
-                                    wrap.style.display = e.target.checked
-                                      ? "block"
-                                      : "none";
-                                }}
-                              />
-                              Higiene habitacional
-                            </label>
-                            <div
-                              id={`wrap-higiene_habitacional-${secao.id}`}
-                              style={{ display: "none" }}
-                              className="service-config"
-                            >
-                              <div className="form-row">
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`periodicidade_higiene_habitacional-${secao.id}`}
-                                  >
-                                    Periodicidade (Higiene habitacional)
-                                  </label>
-                                  <select
-                                    id={`periodicidade_higiene_habitacional-${secao.id}`}
-                                    name="periodicidade_higiene_habitacional"
-                                    defaultValue=""
-                                  >
-                                    <option value="">Selecione</option>
-                                    <option value="segunda a sexta">
-                                      Segunda a sexta
-                                    </option>
-                                    <option value="segunda a sabado">
-                                      Segunda a sábado
-                                    </option>
-                                    <option value="segunda a domingo">
-                                      Segunda a domingo
-                                    </option>
-                                  </select>
-                                </div>
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`vezes_higiene_habitacional-${secao.id}`}
-                                  >
-                                    Vezes por dia (Higiene habitacional)
-                                  </label>
-                                  <input
-                                    id={`vezes_higiene_habitacional-${secao.id}`}
-                                    name="vezes_higiene_habitacional"
-                                    type="number"
-                                    min="1"
-                                    max="5"
-                                    placeholder="1-5"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-row checkbox-row">
-                          <div className="form-field checkbox-field">
-                            <label>
-                              <input
-                                type="checkbox"
-                                name="refeicoes"
-                                id={`refeicoes-${secao.id}`}
-                                onChange={(e) => {
-                                  const wrap = document.getElementById(
-                                    `wrap-refeicoes-${secao.id}`,
-                                  );
-                                  if (wrap)
-                                    wrap.style.display = e.target.checked
-                                      ? "block"
-                                      : "none";
-                                }}
-                              />
-                              Refeições
-                            </label>
-                            <div
-                              id={`wrap-refeicoes-${secao.id}`}
-                              style={{ display: "none" }}
-                              className="service-config"
-                            >
-                              <div className="form-row">
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`periodicidade_refeicoes-${secao.id}`}
-                                  >
-                                    Periodicidade (Refeições)
-                                  </label>
-                                  <select
-                                    id={`periodicidade_refeicoes-${secao.id}`}
-                                    name="periodicidade_refeicoes"
-                                    defaultValue=""
-                                  >
-                                    <option value="">Selecione</option>
-                                    <option value="segunda a sexta">
-                                      Segunda a sexta
-                                    </option>
-                                    <option value="segunda a sabado">
-                                      Segunda a sábado
-                                    </option>
-                                    <option value="segunda a domingo">
-                                      Segunda a domingo
-                                    </option>
-                                  </select>
+                          <div className="form-row checkbox-row">
+                            <div className="form-field checkbox-field">
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  name="refeicoes"
+                                  id={`refeicoes-${secao.id}`}
+                                  onChange={(e) => {
+                                    const wrap = document.getElementById(
+                                      `wrap-refeicoes-${secao.id}`,
+                                    );
+                                    if (wrap)
+                                      wrap.style.display = e.target.checked
+                                        ? "block"
+                                        : "none";
+                                  }}
+                                />
+                                Refeições
+                              </label>
+                              <div
+                                id={`wrap-refeicoes-${secao.id}`}
+                                style={{ display: "none" }}
+                                className="service-config"
+                              >
+                                <div className="form-row">
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`periodicidade_refeicoes-${secao.id}`}
+                                    >
+                                      Periodicidade (Refeições)
+                                    </label>
+                                    <select
+                                      id={`periodicidade_refeicoes-${secao.id}`}
+                                      name="periodicidade_refeicoes"
+                                      defaultValue=""
+                                    >
+                                      <option value="">Selecione</option>
+                                      <option value="segunda a sexta">
+                                        Segunda a sexta
+                                      </option>
+                                      <option value="segunda a sabado">
+                                        Segunda a sábado
+                                      </option>
+                                      <option value="segunda a domingo">
+                                        Segunda a domingo
+                                      </option>
+                                    </select>
+                                  </div>
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`vezes_refeicoes-${secao.id}`}
+                                    >
+                                      Vezes por dia (Refeições)
+                                    </label>
+                                    <input
+                                      id={`vezes_refeicoes-${secao.id}`}
+                                      name="vezes_refeicoes"
+                                      type="number"
+                                      min="1"
+                                      max="5"
+                                      placeholder="1-5"
+                                    />
+                                  </div>
                                 </div>
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`vezes_refeicoes-${secao.id}`}
-                                  >
-                                    Vezes por dia (Refeições)
-                                  </label>
-                                  <input
-                                    id={`vezes_refeicoes-${secao.id}`}
-                                    name="vezes_refeicoes"
-                                    type="number"
-                                    min="1"
-                                    max="5"
-                                    placeholder="1-5"
-                                  />
+                              </div>
+                            </div>
+                            <div className="form-field checkbox-field">
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  name="tratamento_roupa"
+                                  id={`tratamento_roupa-${secao.id}`}
+                                  onChange={(e) => {
+                                    const wrap = document.getElementById(
+                                      `wrap-tratamento_roupa-${secao.id}`,
+                                    );
+                                    if (wrap)
+                                      wrap.style.display = e.target.checked
+                                        ? "block"
+                                        : "none";
+                                  }}
+                                />
+                                Tratamento de roupa
+                              </label>
+                              <div
+                                id={`wrap-tratamento_roupa-${secao.id}`}
+                                style={{ display: "none" }}
+                                className="service-config"
+                              >
+                                <div className="form-row">
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`periodicidade_tratamento_roupa-${secao.id}`}
+                                    >
+                                      Periodicidade (Tratamento de roupa)
+                                    </label>
+                                    <select
+                                      id={`periodicidade_tratamento_roupa-${secao.id}`}
+                                      name="periodicidade_tratamento_roupa"
+                                      defaultValue=""
+                                    >
+                                      <option value="">Selecione</option>
+                                      <option value="segunda a sexta">
+                                        Segunda a sexta
+                                      </option>
+                                      <option value="segunda a sabado">
+                                        Segunda a sábado
+                                      </option>
+                                      <option value="segunda a domingo">
+                                        Segunda a domingo
+                                      </option>
+                                    </select>
+                                  </div>
+                                  <div className="form-field">
+                                    <label
+                                      htmlFor={`vezes_tratamento_roupa-${secao.id}`}
+                                    >
+                                      Vezes por dia (Tratamento de roupa)
+                                    </label>
+                                    <input
+                                      id={`vezes_tratamento_roupa-${secao.id}`}
+                                      name="vezes_tratamento_roupa"
+                                      type="number"
+                                      min="1"
+                                      max="5"
+                                      placeholder="1-5"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
-                          <div className="form-field checkbox-field">
-                            <label>
-                              <input
-                                type="checkbox"
-                                name="tratamento_roupa"
-                                id={`tratamento_roupa-${secao.id}`}
-                                onChange={(e) => {
-                                  const wrap = document.getElementById(
-                                    `wrap-tratamento_roupa-${secao.id}`,
-                                  );
-                                  if (wrap)
-                                    wrap.style.display = e.target.checked
-                                      ? "block"
-                                      : "none";
-                                }}
-                              />
-                              Tratamento de roupa
-                            </label>
-                            <div
-                              id={`wrap-tratamento_roupa-${secao.id}`}
-                              style={{ display: "none" }}
-                              className="service-config"
-                            >
-                              <div className="form-row">
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`periodicidade_tratamento_roupa-${secao.id}`}
-                                  >
-                                    Periodicidade (Tratamento de roupa)
-                                  </label>
-                                  <select
-                                    id={`periodicidade_tratamento_roupa-${secao.id}`}
-                                    name="periodicidade_tratamento_roupa"
-                                    defaultValue=""
-                                  >
-                                    <option value="">Selecione</option>
-                                    <option value="segunda a sexta">
-                                      Segunda a sexta
-                                    </option>
-                                    <option value="segunda a sabado">
-                                      Segunda a sábado
-                                    </option>
-                                    <option value="segunda a domingo">
-                                      Segunda a domingo
-                                    </option>
-                                  </select>
-                                </div>
-                                <div className="form-field">
-                                  <label
-                                    htmlFor={`vezes_tratamento_roupa-${secao.id}`}
-                                  >
-                                    Vezes por dia (Tratamento de roupa)
-                                  </label>
-                                  <input
-                                    id={`vezes_tratamento_roupa-${secao.id}`}
-                                    name="vezes_tratamento_roupa"
-                                    type="number"
-                                    min="1"
-                                    max="5"
-                                    placeholder="1-5"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="form-actions" style={{ marginTop: 10 }}>
-                          <button type="submit" className="btn-save">
-                            Enviar inscrição SAD
-                          </button>
-                        </div>
-                      </form>
-                    </>
-                  )}
-                </div>
+                          <div
+                            className="form-actions"
+                            style={{ marginTop: 10 }}
+                          >
+                            <button type="submit" className="btn-save">
+                              Enviar inscrição SAD
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })}
+
+        <section id="contactos" className="section">
+          <div className="container">
+            <div className="section-header-editable">
+              <h2>Contactos</h2>
+              {isEditMode && user && (
+                <button
+                  className="btn-edit-inline"
+                  onClick={() =>
+                    handleEdit("contactos", {
+                      morada: "Estrada da Igreja, nº468, Lanheses",
+                      telefone: "258 739 900",
+                      email: "geral@cpslanheses.pt",
+                    })
+                  }
+                  title="Editar Contactos"
+                >
+                  ✏️
+                </button>
               )}
             </div>
-          </section>
-        );
-      })}
+            <div className="contact-info">
+              <p>
+                <strong>Morada:</strong> Estrada da Igreja, nº468, Lanheses
+              </p>
+              <p>
+                <strong>Telefone:</strong> 258 739 900
+              </p>
+              <p>
+                <strong>Email:</strong> geral@cpslanheses.pt
+              </p>
+            </div>
 
-      <section id="contactos" className="section">
-        <div className="container">
-          <div className="section-header-editable">
-            <h2>Contactos</h2>
-            {isEditMode && user && (
-              <button
-                className="btn-edit-inline"
-                onClick={() =>
-                  handleEdit("contactos", {
-                    morada: "Estrada da Igreja, nº468, Lanheses",
-                    telefone: "258 739 900",
-                    email: "geral@cpslanheses.pt",
-                  })
-                }
-                title="Editar Contactos"
-              >
-                ✏️
-              </button>
-            )}
-          </div>
-          <div className="contact-info">
-            <p>
-              <strong>Morada:</strong> Estrada da Igreja, nº468, Lanheses
-            </p>
-            <p>
-              <strong>Telefone:</strong> 258 739 900
-            </p>
-            <p>
-              <strong>Email:</strong> geral@cpslanheses.pt
-            </p>
-          </div>
-
-          {/* Formulário de contacto público */}
-          <div className="contact-form">
-            <h3>Envie-nos uma mensagem</h3>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const data = {
-                  nome: form.nome.value,
-                  email: form.email.value,
-                  assunto: form.assunto.value,
-                  mensagem: form.mensagem.value,
-                };
-                try {
-                  const resp = await api.post("/contactos/form", data);
-                  if (resp.data && resp.data.success) {
-                    alert("Mensagem enviada. Obrigado!");
-                    form.reset();
-                  } else {
+            {/* Formulário de contacto público */}
+            <div className="contact-form">
+              <h3>Envie-nos uma mensagem</h3>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const data = {
+                    nome: form.nome.value,
+                    email: form.email.value,
+                    assunto: form.assunto.value,
+                    mensagem: form.mensagem.value,
+                  };
+                  try {
+                    const resp = await api.post("/contactos/form", data);
+                    if (resp.data && resp.data.success) {
+                      alert("Mensagem enviada. Obrigado!");
+                      form.reset();
+                    } else {
+                      alert("Erro ao enviar mensagem.");
+                    }
+                  } catch (err) {
+                    console.error(err);
                     alert("Erro ao enviar mensagem.");
                   }
-                } catch (err) {
-                  console.error(err);
-                  alert("Erro ao enviar mensagem.");
-                }
-              }}
-            >
-              <div className="form-row">
-                <div className="form-field name-field">
-                  <label htmlFor="nome">Nome</label>
-                  <div className="input-with-icon">
-                    <span className="input-icon">👤</span>
-                    <input id="nome" name="nome" placeholder="Nome" required />
+                }}
+              >
+                <div className="form-row">
+                  <div className="form-field name-field">
+                    <label htmlFor="nome">Nome</label>
+                    <div className="input-with-icon">
+                      <span className="input-icon">👤</span>
+                      <input
+                        id="nome"
+                        name="nome"
+                        placeholder="Nome"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-field email-field">
+                    <label htmlFor="email">Email</label>
+                    <div className="input-with-icon">
+                      <span className="input-icon">✉️</span>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="Email"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="form-field email-field">
-                  <label htmlFor="email">Email</label>
+                <div className="form-field subject-field">
+                  <label htmlFor="assunto">Assunto</label>
                   <div className="input-with-icon">
-                    <span className="input-icon">✉️</span>
+                    <span className="input-icon">📝</span>
                     <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="Email"
+                      id="assunto"
+                      name="assunto"
+                      placeholder="Assunto"
                       required
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="form-field subject-field">
-                <label htmlFor="assunto">Assunto</label>
-                <div className="input-with-icon">
-                  <span className="input-icon">📝</span>
-                  <input
-                    id="assunto"
-                    name="assunto"
-                    placeholder="Assunto"
+                <div className="form-field message-field">
+                  <label htmlFor="mensagem">Mensagem</label>
+                  <textarea
+                    id="mensagem"
+                    name="mensagem"
+                    rows="6"
+                    placeholder="Mensagem"
                     required
                   />
                 </div>
-              </div>
 
-              <div className="form-field message-field">
-                <label htmlFor="mensagem">Mensagem</label>
-                <textarea
-                  id="mensagem"
-                  name="mensagem"
-                  rows="6"
-                  placeholder="Mensagem"
-                  required
-                />
-              </div>
-
-              <div className="form-actions" style={{ marginTop: 10 }}>
-                <button type="submit" className="btn-save">
-                  Enviar Mensagem
-                </button>
-              </div>
-            </form>
+                <div className="form-actions" style={{ marginTop: 10 }}>
+                  <button type="submit" className="btn-save">
+                    Enviar Mensagem
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {showTranspModal && (
-        <div className="edit-modal-overlay">
-          <div
-            className="edit-modal edit-modal--wide"
-            onClick={(e) => e.stopPropagation()}
-            ref={transpModalRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="transp-modal-title"
-            onKeyDown={(e) =>
-              handleModalKeyDown(e, transpModalRef, () => {
-                setShowTranspModal(false);
-                setTranspEditingDoc(null);
-              })
-            }
-          >
-            <div className="edit-modal-header">
-              <h3 id="transp-modal-title">
-                {transpEditingDoc
-                  ? "Editar documento de transparência"
-                  : "Adicionar documento de transparência"}
-              </h3>
-              <button
-                className="btn-close"
-                onClick={() => {
+        {showTranspModal && (
+          <div className="edit-modal-overlay">
+            <div
+              className="edit-modal edit-modal--wide"
+              onClick={(e) => e.stopPropagation()}
+              ref={transpModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="transp-modal-title"
+              onKeyDown={(e) =>
+                handleModalKeyDown(e, transpModalRef, () => {
                   setShowTranspModal(false);
                   setTranspEditingDoc(null);
-                }}
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form className="edit-modal-body" onSubmit={handleTranspSubmit}>
-              <div className="form-group">
-                <label htmlFor="transp-titulo">Título *</label>
-                <input
-                  id="transp-titulo"
-                  name="titulo"
-                  type="text"
-                  value={transpForm.titulo}
-                  onChange={handleTranspChange}
-                  required
-                />
+                })
+              }
+            >
+              <div className="edit-modal-header">
+                <h3 id="transp-modal-title">
+                  {transpEditingDoc
+                    ? "Editar documento de transparência"
+                    : "Adicionar documento de transparência"}
+                </h3>
+                <button
+                  className="btn-close"
+                  onClick={() => {
+                    setShowTranspModal(false);
+                    setTranspEditingDoc(null);
+                  }}
+                  aria-label="Fechar"
+                >
+                  ✕
+                </button>
               </div>
 
-              <div className="form-row">
+              <form className="edit-modal-body" onSubmit={handleTranspSubmit}>
                 <div className="form-group">
-                  <label htmlFor="transp-ano">Ano *</label>
+                  <label htmlFor="transp-titulo">Título *</label>
                   <input
-                    id="transp-ano"
-                    name="ano"
-                    type="number"
-                    min="2000"
-                    max="2100"
-                    value={transpForm.ano}
+                    id="transp-titulo"
+                    name="titulo"
+                    type="text"
+                    value={transpForm.titulo}
                     onChange={handleTranspChange}
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label htmlFor="transp-tipo">Tipo</label>
-                  <select
-                    id="transp-tipo"
-                    name="tipo"
-                    value={transpForm.tipo}
-                    onChange={handleTranspChange}
-                  >
-                    <option value="Relatorio">Relatório & Contas</option>
-                    <option value="Contas">Contas</option>
-                    <option value="Relatorio_Atividades">
-                      Relatório de Atividades
-                    </option>
-                    <option value="Outro">Outro</option>
-                  </select>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="transp-ano">Ano *</label>
+                    <input
+                      id="transp-ano"
+                      name="ano"
+                      type="number"
+                      min="2000"
+                      max="2100"
+                      value={transpForm.ano}
+                      onChange={handleTranspChange}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="transp-tipo">Tipo</label>
+                    <select
+                      id="transp-tipo"
+                      name="tipo"
+                      value={transpForm.tipo}
+                      onChange={handleTranspChange}
+                    >
+                      <option value="Relatorio">Relatório & Contas</option>
+                      <option value="Contas">Contas</option>
+                      <option value="Relatorio_Atividades">
+                        Relatório de Atividades
+                      </option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label htmlFor="transp-descricao">Descrição (opcional)</label>
-                <textarea
-                  id="transp-descricao"
-                  name="descricao"
-                  rows="3"
-                  value={transpForm.descricao}
-                  onChange={handleTranspChange}
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="transp-descricao">Descrição (opcional)</label>
+                  <textarea
+                    id="transp-descricao"
+                    name="descricao"
+                    rows="3"
+                    value={transpForm.descricao}
+                    onChange={handleTranspChange}
+                  />
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="transp-ficheiro">
-                  {transpEditingDoc
-                    ? "Substituir ficheiro (PDF)"
-                    : "Ficheiro PDF *"}
-                </label>
-                <input
-                  id="transp-ficheiro"
-                  name="ficheiro"
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleTranspChange}
-                  required={!transpEditingDoc}
-                />
-                {transpForm.ficheiro && (
-                  <small>Selecionado: {transpForm.ficheiro.name}</small>
+                <div className="form-group">
+                  <label htmlFor="transp-ficheiro">
+                    {transpEditingDoc
+                      ? "Substituir ficheiro (PDF)"
+                      : "Ficheiro PDF *"}
+                  </label>
+                  <input
+                    id="transp-ficheiro"
+                    name="ficheiro"
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleTranspChange}
+                    required={!transpEditingDoc}
+                  />
+                  {transpForm.ficheiro && (
+                    <small>Selecionado: {transpForm.ficheiro.name}</small>
+                  )}
+                  {transpEditingDoc && !transpForm.ficheiro && (
+                    <small>Ficheiro atual será mantido.</small>
+                  )}
+                </div>
+
+                {transpError && (
+                  <div className="alert alert-error">{transpError}</div>
                 )}
-                {transpEditingDoc && !transpForm.ficheiro && (
-                  <small>Ficheiro atual será mantido.</small>
-                )}
-              </div>
 
-              {transpError && (
-                <div className="alert alert-error">{transpError}</div>
-              )}
+                <div className="form-actions" style={{ gap: "10px" }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowTranspModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={transpSubmitting}
+                  >
+                    {transpSubmitting
+                      ? transpEditingDoc
+                        ? "A atualizar..."
+                        : "A enviar..."
+                      : transpEditingDoc
+                        ? "Atualizar documento"
+                        : "Guardar documento"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
-              <div className="form-actions" style={{ gap: "10px" }}>
+        {confirmState.open && (
+          <div
+            className="confirm-modal-overlay"
+            onClick={() => handleConfirm(false)}
+          >
+            <div
+              className="confirm-modal"
+              onClick={(e) => e.stopPropagation()}
+              ref={confirmModalRef}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-modal-title"
+              aria-describedby="confirm-modal-desc"
+              onKeyDown={(e) =>
+                handleModalKeyDown(e, confirmModalRef, () =>
+                  handleConfirm(false),
+                )
+              }
+            >
+              <h3 id="confirm-modal-title">Confirmação</h3>
+              <p id="confirm-modal-desc">{confirmState.message}</p>
+              <div className="confirm-modal-actions">
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setShowTranspModal(false)}
+                  onClick={() => handleConfirm(false)}
                 >
                   Cancelar
                 </button>
                 <button
-                  type="submit"
+                  type="button"
                   className="btn-primary"
-                  disabled={transpSubmitting}
+                  onClick={() => handleConfirm(true)}
                 >
-                  {transpSubmitting
-                    ? transpEditingDoc
-                      ? "A atualizar..."
-                      : "A enviar..."
-                    : transpEditingDoc
-                      ? "Atualizar documento"
-                      : "Guardar documento"}
+                  Confirmar
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {confirmState.open && (
-        <div
-          className="confirm-modal-overlay"
-          onClick={() => handleConfirm(false)}
-        >
-          <div
-            className="confirm-modal"
-            onClick={(e) => e.stopPropagation()}
-            ref={confirmModalRef}
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-modal-title"
-            aria-describedby="confirm-modal-desc"
-            onKeyDown={(e) =>
-              handleModalKeyDown(e, confirmModalRef, () => handleConfirm(false))
-            }
-          >
-            <h3 id="confirm-modal-title">Confirmação</h3>
-            <p id="confirm-modal-desc">{confirmState.message}</p>
-            <div className="confirm-modal-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => handleConfirm(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => handleConfirm(true)}
-              >
-                Confirmar
-              </button>
             </div>
           </div>
-        </div>
-      )}
-
+        )}
       </main>
 
       <footer className="footer">
@@ -5165,9 +5406,7 @@ const Home = ({ isEditMode = false }) => {
                 <li>Estrada da Igreja, nº 468 4925-416 Lanheses</li>
                 <li>
                   Email:{" "}
-                  <a href="mailto:geral@cpslanheses.pt">
-                    geral@cpslanheses.pt
-                  </a>
+                  <a href="mailto:geral@cpslanheses.pt">geral@cpslanheses.pt</a>
                 </li>
                 <li>
                   Telefone: <a href="tel:258739000">258 739 000</a>
@@ -5236,7 +5475,9 @@ const Home = ({ isEditMode = false }) => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-modal-title"
-            onKeyDown={(e) => handleModalKeyDown(e, editModalRef, closeEditModal)}
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, editModalRef, closeEditModal)
+            }
           >
             <div className="edit-modal-header">
               <h3 id="edit-modal-title">
@@ -5345,6 +5586,25 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                       </div>
                     </label>
+
+                    <label style={{ marginTop: "1rem" }}>
+                      <strong>Ou inserir URL da imagem:</strong>
+                      <input
+                        type="url"
+                        value={editingData.imagem || ""}
+                        onChange={(e) =>
+                          setEditingData({
+                            ...editingData,
+                            imagem: e.target.value,
+                          })
+                        }
+                        placeholder="https://exemplo.com/imagem.jpg"
+                      />
+                      <small className="hint">
+                        Cole o endereço completo da imagem (deve começar com
+                        http:// ou https://)
+                      </small>
+                    </label>
                   </div>
                   {renderMediaPicker()}
                   <label>
@@ -5362,7 +5622,7 @@ const Home = ({ isEditMode = false }) => {
                     />
                   </label>
                   <label>
-                    <strong>Resumo/Descrição Breve:</strong>
+                    <strong>Subtítulo:</strong>
                     <textarea
                       value={editingData.subtitulo || ""}
                       onChange={(e) =>
@@ -5372,9 +5632,12 @@ const Home = ({ isEditMode = false }) => {
                         })
                       }
                       rows="2"
-                      placeholder="Descrição breve"
+                      placeholder="Subtítulo ou resumo breve"
                     />
                   </label>
+
+                  {renderRespostaDestaquesEditor()}
+
                   <div className="field">
                     <strong>Conteúdo:</strong>
                     <RichTextEditor
@@ -5593,6 +5856,25 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                       </div>
                     </label>
+
+                    <label style={{ marginTop: "1rem" }}>
+                      <strong>Ou inserir URL da imagem:</strong>
+                      <input
+                        type="url"
+                        value={editingData.imagem_destaque || ""}
+                        onChange={(e) =>
+                          setEditingData({
+                            ...editingData,
+                            imagem_destaque: e.target.value,
+                          })
+                        }
+                        placeholder="https://exemplo.com/imagem.jpg"
+                      />
+                      <small className="hint">
+                        Cole o endereço completo da imagem (deve começar com
+                        http:// ou https://)
+                      </small>
+                    </label>
                   </div>
                   {renderMediaPicker()}
 
@@ -5707,6 +5989,25 @@ const Home = ({ isEditMode = false }) => {
                         </div>
                       </div>
                     </label>
+
+                    <label style={{ marginTop: "1rem" }}>
+                      <strong>Ou inserir URL da imagem:</strong>
+                      <input
+                        type="url"
+                        value={editingData.imagem || ""}
+                        onChange={(e) =>
+                          setEditingData({
+                            ...editingData,
+                            imagem: e.target.value,
+                          })
+                        }
+                        placeholder="https://exemplo.com/imagem.jpg"
+                      />
+                      <small className="hint">
+                        Cole o endereço completo da imagem (deve começar com
+                        http:// ou https://)
+                      </small>
+                    </label>
                   </div>
                   {renderMediaPicker()}
 
@@ -5726,7 +6027,7 @@ const Home = ({ isEditMode = false }) => {
                   </label>
 
                   <label>
-                    <strong>Subtítulo:</strong>
+                    <strong>Descrição Breve:</strong>
                     <input
                       type="text"
                       value={editingData.subtitulo || ""}
@@ -5736,9 +6037,11 @@ const Home = ({ isEditMode = false }) => {
                           subtitulo: e.target.value,
                         })
                       }
-                      placeholder="Subtítulo ou resumo breve"
+                      placeholder="Descrição breve do item"
                     />
                   </label>
+
+                  {renderRespostaDestaquesEditor()}
 
                   <div className="field">
                     <strong>Conteúdo:</strong>
@@ -5854,7 +6157,9 @@ const Home = ({ isEditMode = false }) => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="news-modal-title"
-            onKeyDown={(e) => handleModalKeyDown(e, newsModalRef, closeNewsModal)}
+            onKeyDown={(e) =>
+              handleModalKeyDown(e, newsModalRef, closeNewsModal)
+            }
           >
             <div className="edit-modal-header">
               <h3 id="news-modal-title">{selectedNews.titulo}</h3>
@@ -6004,6 +6309,37 @@ const Home = ({ isEditMode = false }) => {
                   {selectedCustomItem.subtitulo}
                 </p>
               )}
+
+              {(() => {
+                const destaques = buildRespostaDestaques(
+                  selectedCustomItem?.destaques,
+                );
+                if (!destaques.length) return null;
+                return (
+                  <div
+                    className={`resposta-highlights resposta-highlights--${destaques.length}`}
+                    style={{ marginTop: "1rem", marginBottom: "1rem" }}
+                  >
+                    {destaques.map((item, idx) => (
+                      <div
+                        key={`modal-destaque-${idx}`}
+                        className="resposta-highlight"
+                      >
+                        {item.titulo && (
+                          <div className="resposta-highlight-title">
+                            {item.titulo}
+                          </div>
+                        )}
+                        {item.texto && (
+                          <div className="resposta-highlight-text">
+                            {item.texto}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {selectedCustomItem.conteudo && (
                 <div
@@ -6375,6 +6711,36 @@ const Home = ({ isEditMode = false }) => {
                           </div>
                         </div>
                       </label>
+
+                      <label style={{ marginTop: "1rem" }}>
+                        <strong>Ou inserir URL da imagem:</strong>
+                        <input
+                          type="url"
+                          value={
+                            editingSecaoPersonalizada
+                              ? editingData.imagem || ""
+                              : editingData.imagem_destaque || ""
+                          }
+                          onChange={(e) => {
+                            if (editingSecaoPersonalizada) {
+                              setEditingData({
+                                ...editingData,
+                                imagem: e.target.value,
+                              });
+                            } else {
+                              setEditingData({
+                                ...editingData,
+                                imagem_destaque: e.target.value,
+                              });
+                            }
+                          }}
+                          placeholder="https://exemplo.com/imagem.jpg"
+                        />
+                        <small className="hint">
+                          Cole o endereço completo da imagem (deve começar com
+                          http:// ou https://)
+                        </small>
+                      </label>
                     </div>
                   )}
                 {renderMediaPicker()}
@@ -6405,20 +6771,26 @@ const Home = ({ isEditMode = false }) => {
                       <strong>
                         {editingSection === "noticias"
                           ? "Resumo:"
-                          : "Descrição Breve:"}
+                          : editingSecaoPersonalizada
+                            ? "Descrição Breve:"
+                            : "Descrição Breve:"}
                       </strong>
                       <textarea
                         value={
                           editingSection === "respostas-sociais"
                             ? editingData.descricao || ""
-                            : editingData.resumo || ""
+                            : editingSecaoPersonalizada
+                              ? editingData.subtitulo || ""
+                              : editingData.resumo || ""
                         }
                         onChange={(e) =>
                           setEditingData({
                             ...editingData,
                             [editingSection === "respostas-sociais"
                               ? "descricao"
-                              : "resumo"]: e.target.value,
+                              : editingSecaoPersonalizada
+                                ? "subtitulo"
+                                : "resumo"]: e.target.value,
                           })
                         }
                         rows="3"
@@ -6427,7 +6799,9 @@ const Home = ({ isEditMode = false }) => {
                             ? "Breve resumo da notícia"
                             : editingSection === "respostas-sociais"
                               ? "Breve descrição da resposta social"
-                              : "Breve descrição"
+                              : editingSecaoPersonalizada
+                                ? "Descrição breve do item"
+                                : "Breve descrição"
                         }
                       />
                     </label>

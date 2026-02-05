@@ -39,6 +39,7 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
       imagem_url,
       imagem_destaque,
       video_url,
+      destaques,
     } = req.body;
 
     // Suportar tanto 'texto' quanto 'conteudo'
@@ -60,14 +61,14 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
     // Buscar próxima ordem
     const [maxOrdem] = await pool.query(
       "SELECT COALESCE(MAX(ordem), 0) as max_ordem FROM conteudo_institucional WHERE secao = $1",
-      [secao]
+      [secao],
     );
     const ordem = (maxOrdem[0]?.max_ordem || 0) + 1;
 
     const [result] = await pool.query(
       `INSERT INTO conteudo_institucional 
-        (secao, titulo, subtitulo, conteudo, imagem, video_url, ordem, ativo, criado_por, atualizado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9) 
+        (secao, titulo, subtitulo, conteudo, imagem, video_url, destaques, ordem, ativo, criado_por, atualizado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, $10) 
        RETURNING *`,
       [
         secao,
@@ -76,10 +77,11 @@ router.post("/", [authenticate, isAdminOrGestor], async (req, res) => {
         conteudoFinal,
         imagemFinal || null,
         video_url || null,
+        destaques || null,
         ordem,
         req.user.id,
         req.user.id,
-      ]
+      ],
     );
 
     res.json({
@@ -98,7 +100,7 @@ router.delete("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
   try {
     await pool.query(
       "UPDATE conteudo_institucional SET ativo = false WHERE id = $1",
-      [req.params.id]
+      [req.params.id],
     );
     res.json({ success: true, message: "Conteúdo eliminado com sucesso." });
   } catch (error) {
@@ -118,6 +120,7 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       imagem,
       imagem_url,
       video_url,
+      destaques,
       ativo,
     } = req.body;
     const updates = [];
@@ -152,6 +155,10 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       updates.push(`video_url = $${paramIndex++}`);
       values.push(video_url);
     }
+    if (destaques !== undefined) {
+      updates.push(`destaques = $${paramIndex++}`);
+      values.push(destaques);
+    }
     if (ativo !== undefined) {
       updates.push(`ativo = $${paramIndex++}`);
       values.push(ativo);
@@ -169,9 +176,9 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     values.push(req.params.id);
     const [result] = await pool.query(
       `UPDATE conteudo_institucional SET ${updates.join(
-        ", "
+        ", ",
       )} WHERE id = $${paramIndex} RETURNING *`,
-      values
+      values,
     );
 
     res.json({
