@@ -122,6 +122,13 @@
   height: 100%;
 }
 
+.project-item[draggable="true"] {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
 .project-item:hover {
   transform: translateY(-4px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -288,6 +295,13 @@
   position: relative;
 }
 
+.transparency-card[draggable="true"] {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
 .transparency-actions {
   position: absolute;
   top: 10px;
@@ -329,7 +343,8 @@
 }
 
 .footer {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 20% 20%,
       rgba(255, 255, 255, 0.08),
       transparent 45%
@@ -1075,6 +1090,14 @@
   overflow-wrap: break-word;
 }
 
+/* Prevenir seleção de texto durante drag */
+.content-subsection[draggable="true"] {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
 .content-subsection:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
@@ -1481,10 +1504,9 @@
 }
 
 .erpi-form .form-row.row-address-4 {
-  grid-template-columns: minmax(360px, 4fr) minmax(120px, 1fr) minmax(
-      180px,
-      1.2fr
-    ) minmax(180px, 1.2fr);
+  grid-template-columns:
+    minmax(360px, 4fr) minmax(120px, 1fr) minmax(180px, 1.2fr)
+    minmax(180px, 1.2fr);
 }
 
 .erpi-form .form-row.row-address-2 {

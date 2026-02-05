@@ -122,6 +122,7 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
       video_url,
       destaques,
       ativo,
+      ordem,
     } = req.body;
     const updates = [];
     const values = [];
@@ -162,6 +163,10 @@ router.put("/:id", [authenticate, isAdminOrGestor], async (req, res) => {
     if (ativo !== undefined) {
       updates.push(`ativo = $${paramIndex++}`);
       values.push(ativo);
+    }
+    if (ordem !== undefined) {
+      updates.push(`ordem = $${paramIndex++}`);
+      values.push(ordem);
     }
 
     updates.push(`atualizado_por = $${paramIndex++}`);

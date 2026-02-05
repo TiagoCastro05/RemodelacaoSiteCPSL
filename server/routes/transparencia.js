@@ -12,7 +12,7 @@ const {
 router.get("/", async (req, res) => {
   try {
     const { ano, tipo } = req.query;
-  let query = "SELECT * FROM transparencia";
+    let query = "SELECT * FROM transparencia";
     const params = [];
     const conditions = [];
     let paramIndex = 1;
@@ -55,8 +55,7 @@ router.post(
         "Outro",
       ];
 
-      const normalizedTipo =
-        tipo === "Relatorio_Contas" ? "Relatorio" : tipo;
+      const normalizedTipo = tipo === "Relatorio_Contas" ? "Relatorio" : tipo;
 
       const safeTipo = allowedTipos.includes(normalizedTipo)
         ? normalizedTipo
@@ -96,7 +95,7 @@ router.post(
           ficheiro_url,
           tamanho,
           req.user.id,
-        ]
+        ],
       );
 
       res.status(201).json({
@@ -106,15 +105,14 @@ router.post(
       });
     } catch (error) {
       console.error("[transparencia] POST error", error);
-            res.status(500).json({
-              success: false,
-              message:
-                error.message?.includes("invalid input value for enum")
-                  ? "Tipo inválido. Use Relatorio_Contas, Relatorio_Atividades ou Outro."
-                  : error.message || "Erro no servidor.",
-            });
+      res.status(500).json({
+        success: false,
+        message: error.message?.includes("invalid input value for enum")
+          ? "Tipo inválido. Use Relatorio_Contas, Relatorio_Atividades ou Outro."
+          : error.message || "Erro no servidor.",
+      });
     }
-  }
+  },
 );
 
 // PUT - Atualizar documento de transparência (metadados e ficheiro opcional)
@@ -124,7 +122,7 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { titulo, descricao, ano, tipo } = req.body;
+      const { titulo, descricao, ano, tipo, ordem } = req.body;
 
       const allowedTipos = [
         "Relatorio",
@@ -133,8 +131,7 @@ router.put(
         "Outro",
       ];
 
-      const normalizedTipo =
-        tipo === "Relatorio_Contas" ? "Relatorio" : tipo;
+      const normalizedTipo = tipo === "Relatorio_Contas" ? "Relatorio" : tipo;
 
       const safeTipo = allowedTipos.includes(normalizedTipo)
         ? normalizedTipo
@@ -143,7 +140,7 @@ router.put(
       // obter registo atual para preservar ficheiro quando não é enviado novo
       const [existingRows] = await pool.query(
         "SELECT ficheiro_url, tamanho_ficheiro FROM transparencia WHERE id = $1",
-        [id]
+        [id],
       );
       if (!existingRows.length) {
         return res
@@ -177,17 +174,9 @@ router.put(
 
       await pool.query(
         `UPDATE transparencia
-         SET titulo = $1, descricao = $2, ano = $3, tipo = $4, ficheiro_url = $5, tamanho_ficheiro = $6, data_atualizacao = CURRENT_TIMESTAMP
-         WHERE id = $7`,
-        [
-          titulo,
-          descricao || null,
-          ano,
-          safeTipo,
-          ficheiro_url,
-          tamanho,
-          id,
-        ]
+         SET titulo = $1, descricao = $2, ano = $3, tipo = $4, ficheiro_url = $5, tamanho_ficheiro = $6, ordem = COALESCE($7, ordem), data_atualizacao = CURRENT_TIMESTAMP
+         WHERE id = $8`,
+        [titulo, descricao, ano, safeTipo, ficheiro_url, tamanho, ordem, id],
       );
 
       res.json({ success: true, message: "Documento atualizado com sucesso." });
@@ -195,7 +184,7 @@ router.put(
       console.error("[transparencia] PUT error", error);
       res.status(500).json({ success: false, message: "Erro no servidor." });
     }
-  }
+  },
 );
 
 // DELETE - Eliminar documento

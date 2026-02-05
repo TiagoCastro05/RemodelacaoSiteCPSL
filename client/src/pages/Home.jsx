@@ -402,6 +402,12 @@ const Home = ({ isEditMode = false }) => {
   const [crecheSelecao, setCrecheSelecao] = useState({});
   const [crecheNasceuState, setCrecheNasceuState] = useState({});
   const [heroConfig, setHeroConfig] = useState(DEFAULT_HERO);
+
+  // Estados para drag and drop
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [draggedSection, setDraggedSection] = useState(null);
+  const [draggedSecaoId, setDraggedSecaoId] = useState(null);
+
   const lastFocusedRef = useRef(null);
   const editModalRef = useRef(null);
   const addModalRef = useRef(null);
@@ -972,25 +978,31 @@ const Home = ({ isEditMode = false }) => {
   }, []);
 
   // Buscar projetos da API
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoadingProjects(true);
-        const response = await api.get("/projetos");
-        // Filtrar apenas projetos ativos
-        const activeProjects = (response.data.data || []).filter(
-          (project) => project.ativo,
-        );
-        setProjects(activeProjects);
-      } catch (error) {
-        console.error("Erro ao carregar projetos:", error);
-      } finally {
-        setLoadingProjects(false);
-      }
-    };
-
-    fetchProjects();
+  const fetchProjects = useCallback(async () => {
+    try {
+      setLoadingProjects(true);
+      const response = await api.get("/projetos");
+      const base = getBaseUrl();
+      // Normalizar URLs de imagens e filtrar apenas projetos ativos
+      const allProjects = (response.data.data || []).map((project) => ({
+        ...project,
+        imagem_destaque:
+          project.imagem_destaque && !project.imagem_destaque.startsWith("http")
+            ? `${base}${project.imagem_destaque}`
+            : project.imagem_destaque,
+      }));
+      const activeProjects = allProjects.filter((project) => project.ativo);
+      setProjects(activeProjects);
+    } catch (error) {
+      console.error("Erro ao carregar projetos:", error);
+    } finally {
+      setLoadingProjects(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   // Documentos de Transparência
   const [transparenciaDocs, setTransparenciaDocs] = useState([]);
@@ -1007,7 +1019,7 @@ const Home = ({ isEditMode = false }) => {
     ficheiro: null,
   });
 
-  const fetchTransparencia = async () => {
+  const fetchTransparencia = useCallback(async () => {
     try {
       setLoadingTransparencia(true);
       const { data } = await api.get("/transparencia");
@@ -1025,21 +1037,121 @@ const Home = ({ isEditMode = false }) => {
     } finally {
       setLoadingTransparencia(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTransparencia();
   }, []);
 
   // Buscar conteúdo institucional
+  const fetchConteudo = useCallback(async () => {
+    try {
+      setLoadingContent(true);
+      const response = await api.get("/conteudo");
+      if (response.data.success) {
+        const base = getBaseUrl();
+        const normalized = (response.data.data || []).map((item) => ({
+          ...item,
+          imagem:
+            item.imagem && !item.imagem.startsWith("http")
+              ? `${base}${item.imagem}`
+              : item.imagem,
+        }));
+        const withMedia = await Promise.all(
+          normalized.map(async (item) => ({
+            ...item,
+            media: await fetchMediaForItem("conteudo_institucional", item.id),
+          })),
+        );
+        setConteudoInstitucional(withMedia);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar conteúdo:", error);
+    } finally {
+      setLoadingContent(false);
+    }
+  }, [fetchMediaForItem]);
+
   useEffect(() => {
-    const fetchContent = async () => {
+    fetchConteudo();
+  }, [fetchConteudo]);
+
+  // Buscar respostas sociais
+  const fetchRespostas = useCallback(async () => {
+    try {
+      setLoadingRespostas(true);
+      const response = await api.get("/respostas-sociais");
+      if (response.data.success) {
+        const base = getBaseUrl();
+        const normalized = (response.data.data || []).map((item) => ({
+          ...item,
+          imagem_destaque:
+            item.imagem_destaque && !item.imagem_destaque.startsWith("http")
+              ? `${base}${item.imagem_destaque}`
+              : item.imagem_destaque,
+        }));
+        const withMedia = await Promise.all(
+          normalized.map(async (item) => ({
+            ...item,
+            media: await fetchMediaForItem("respostas_sociais", item.id),
+          })),
+        );
+        setRespostasSociais(withMedia);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar respostas sociais:", error);
+    } finally {
+      setLoadingRespostas(false);
+    }
+  }, [fetchMediaForItem]);
+
+  useEffect(() => {
+    fetchRespostas();
+  }, [fetchRespostas]);
+
+  // Buscar notícias
+  const fetchNoticias = useCallback(async () => {
+    try {
+      setLoadingNoticias(true);
+      const response = await api.get("/noticias");
+      if (response.data.success) {
+        const base = getBaseUrl();
+        const normalized = (response.data.data || []).map((n) => {
+          const obj = { ...n };
+          if (obj.imagem_destaque && !obj.imagem_destaque.startsWith("http")) {
+            obj.imagem_destaque = `${base}${obj.imagem_destaque}`;
+          }
+          return obj;
+        });
+        const withMedia = await Promise.all(
+          normalized.map(async (item) => ({
+            ...item,
+            media: await fetchMediaForItem("noticias_eventos", item.id),
+          })),
+        );
+        setNoticias(withMedia);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar notícias:", error);
+    } finally {
+      setLoadingNoticias(false);
+    }
+  }, [fetchMediaForItem]);
+
+  useEffect(() => {
+    fetchNoticias();
+  }, [fetchNoticias]);
+
+  // Buscar itens de uma seção específica
+  const fetchItensSecao = useCallback(
+    async (secaoId) => {
       try {
-        setLoadingContent(true);
-        const response = await api.get("/conteudo");
-        if (response.data.success) {
-          const base = getBaseUrl();
-          const normalized = (response.data.data || []).map((item) => ({
+        const base = getBaseUrl();
+        const itensResp = await api.get(
+          `/secoes-personalizadas/${secaoId}/itens`,
+        );
+        if (itensResp.data.success) {
+          const normalized = (itensResp.data.data || []).map((item) => ({
             ...item,
             imagem:
               item.imagem && !item.imagem.startsWith("http")
@@ -1049,89 +1161,23 @@ const Home = ({ isEditMode = false }) => {
           const withMedia = await Promise.all(
             normalized.map(async (item) => ({
               ...item,
-              media: await fetchMediaForItem("conteudo_institucional", item.id),
+              media: await fetchMediaForItem(
+                "itens_secoes_personalizadas",
+                item.id,
+              ),
             })),
           );
-          setConteudoInstitucional(withMedia);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar conteúdo:", error);
-      } finally {
-        setLoadingContent(false);
-      }
-    };
-
-    fetchContent();
-  }, [fetchMediaForItem]);
-
-  // Buscar respostas sociais
-  useEffect(() => {
-    const fetchRespostas = async () => {
-      try {
-        setLoadingRespostas(true);
-        const response = await api.get("/respostas-sociais");
-        if (response.data.success) {
-          const base = getBaseUrl();
-          const normalized = (response.data.data || []).map((item) => ({
-            ...item,
-            imagem_destaque:
-              item.imagem_destaque && !item.imagem_destaque.startsWith("http")
-                ? `${base}${item.imagem_destaque}`
-                : item.imagem_destaque,
+          setItensSecoesPersonalizadas((prev) => ({
+            ...prev,
+            [secaoId]: withMedia,
           }));
-          const withMedia = await Promise.all(
-            normalized.map(async (item) => ({
-              ...item,
-              media: await fetchMediaForItem("respostas_sociais", item.id),
-            })),
-          );
-          setRespostasSociais(withMedia);
         }
       } catch (error) {
-        console.error("Erro ao carregar respostas sociais:", error);
-      } finally {
-        setLoadingRespostas(false);
+        console.error("Erro ao carregar itens da seção:", error);
       }
-    };
-
-    fetchRespostas();
-  }, [fetchMediaForItem]);
-
-  // Buscar notícias
-  useEffect(() => {
-    const fetchNoticias = async () => {
-      try {
-        setLoadingNoticias(true);
-        const response = await api.get("/noticias");
-        if (response.data.success) {
-          const base = getBaseUrl();
-          const normalized = (response.data.data || []).map((n) => {
-            const obj = { ...n };
-            if (
-              obj.imagem_destaque &&
-              !obj.imagem_destaque.startsWith("http")
-            ) {
-              obj.imagem_destaque = `${base}${obj.imagem_destaque}`;
-            }
-            return obj;
-          });
-          const withMedia = await Promise.all(
-            normalized.map(async (item) => ({
-              ...item,
-              media: await fetchMediaForItem("noticias_eventos", item.id),
-            })),
-          );
-          setNoticias(withMedia);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar notícias:", error);
-      } finally {
-        setLoadingNoticias(false);
-      }
-    };
-
-    fetchNoticias();
-  }, [fetchMediaForItem]);
+    },
+    [fetchMediaForItem],
+  );
 
   // Buscar seções personalizadas
   useEffect(() => {
@@ -1514,6 +1560,115 @@ const Home = ({ isEditMode = false }) => {
     } catch (error) {
       console.error("Erro ao eliminar:", error);
       alert("Erro ao eliminar item.");
+    }
+  };
+
+  // Funções de Drag and Drop
+  const handleDragStart = (e, item, section, secaoId = null) => {
+    setDraggedItem(item);
+    setDraggedSection(section);
+    setDraggedSecaoId(secaoId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = async (e, targetItem, section, secaoId = null) => {
+    e.preventDefault();
+    if (
+      !draggedItem ||
+      draggedItem.id === targetItem.id ||
+      draggedSection !== section ||
+      (section === "secao-personalizada" && draggedSecaoId !== secaoId)
+    ) {
+      setDraggedItem(null);
+      setDraggedSection(null);
+      setDraggedSecaoId(null);
+      return;
+    }
+
+    try {
+      let items = [];
+      let endpoint = "";
+
+      if (section === "secao-personalizada" && secaoId) {
+        items = itensSecoesPersonalizadas[secaoId] || [];
+        endpoint = `/secoes-personalizadas/${secaoId}/itens`;
+      } else if (section === "respostas-sociais") {
+        items = respostasSociais;
+        endpoint = "/respostas-sociais";
+      } else if (section === "noticias") {
+        items = noticias;
+        endpoint = "/noticias";
+      } else if (section === "institucional") {
+        items = conteudoInstitucional;
+        endpoint = "/conteudo";
+      } else if (section === "projetos") {
+        items = projects;
+        endpoint = "/projetos";
+      } else if (section === "transparencia") {
+        items = transparenciaDocs;
+        endpoint = "/transparencia";
+      }
+
+      const draggedIndex = items.findIndex((i) => i.id === draggedItem.id);
+      const targetIndex = items.findIndex((i) => i.id === targetItem.id);
+
+      if (draggedIndex === -1 || targetIndex === -1) {
+        setDraggedItem(null);
+        setDraggedSection(null);
+        setDraggedSecaoId(null);
+        return;
+      }
+
+      const newItems = [...items];
+      // Trocar diretamente as posições dos dois items
+      [newItems[draggedIndex], newItems[targetIndex]] = [
+        newItems[targetIndex],
+        newItems[draggedIndex],
+      ];
+
+      // Atualizar ordem no backend
+      const updatePromises = newItems.map((item, index) =>
+        api.put(`${endpoint}/${item.id}`, {
+          ...item,
+          ordem: index + 1,
+        }),
+      );
+
+      await Promise.all(updatePromises);
+
+      // Atualizar estado local
+      if (section === "secao-personalizada" && secaoId) {
+        setItensSecoesPersonalizadas({
+          ...itensSecoesPersonalizadas,
+          [secaoId]: newItems,
+        });
+        await fetchItensSecao(secaoId);
+      } else if (section === "respostas-sociais") {
+        await fetchRespostas();
+      } else if (section === "noticias") {
+        await fetchNoticias();
+      } else if (section === "institucional") {
+        await fetchConteudo();
+      } else if (section === "projetos") {
+        await fetchProjects();
+      } else if (section === "transparencia") {
+        await fetchTransparencia();
+      }
+
+      setDraggedItem(null);
+      setDraggedSection(null);
+      setDraggedSecaoId(null);
+    } catch (error) {
+      console.error("Erro ao reordenar:", error);
+      alert("Erro ao alterar ordem do item.");
+      setDraggedItem(null);
+      setDraggedSection(null);
+      setDraggedSecaoId(null);
     }
   };
 
@@ -1902,8 +2057,19 @@ const Home = ({ isEditMode = false }) => {
                   <div
                     key={content.id}
                     className="content-subsection"
+                    draggable={isEditMode && user ? true : false}
+                    onDragStart={(e) =>
+                      isEditMode && handleDragStart(e, content, "institucional")
+                    }
+                    onDragOver={isEditMode ? handleDragOver : undefined}
+                    onDrop={(e) =>
+                      isEditMode && handleDrop(e, content, "institucional")
+                    }
                     onClick={() => !isEditMode && openInstitutional(content)}
-                    style={{ cursor: !isEditMode ? "pointer" : "default" }}
+                    style={{
+                      cursor: isEditMode && user ? "move" : "pointer",
+                      opacity: draggedItem?.id === content.id ? 0.5 : 1,
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) =>
@@ -2030,13 +2196,27 @@ const Home = ({ isEditMode = false }) => {
                     className={`project-item ${
                       project.url_externa ? "clickable" : ""
                     }`}
+                    draggable={isEditMode && user ? true : false}
+                    onDragStart={(e) =>
+                      isEditMode && handleDragStart(e, project, "projetos")
+                    }
+                    onDragOver={isEditMode ? handleDragOver : undefined}
+                    onDrop={(e) =>
+                      isEditMode && handleDrop(e, project, "projetos")
+                    }
                     onClick={() => {
-                      if (project.url_externa) {
+                      if (!isEditMode && project.url_externa) {
                         window.open(project.url_externa, "_blank");
                       }
                     }}
                     style={{
-                      cursor: project.url_externa ? "pointer" : "default",
+                      cursor:
+                        isEditMode && user
+                          ? "move"
+                          : project.url_externa
+                            ? "pointer"
+                            : "default",
+                      opacity: draggedItem?.id === project.id ? 0.5 : 1,
                     }}
                     role={project.url_externa ? "link" : undefined}
                     tabIndex={project.url_externa ? 0 : undefined}
@@ -2046,7 +2226,7 @@ const Home = ({ isEditMode = false }) => {
                         : undefined
                     }
                     onKeyDown={(e) => {
-                      if (!project.url_externa) return;
+                      if (!project.url_externa || isEditMode) return;
                       handleActionKeyDown(e, () =>
                         window.open(project.url_externa, "_blank"),
                       );
@@ -2124,8 +2304,20 @@ const Home = ({ isEditMode = false }) => {
                   <div
                     key={resposta.id}
                     className="content-subsection"
+                    draggable={isEditMode && user ? true : false}
+                    onDragStart={(e) =>
+                      isEditMode &&
+                      handleDragStart(e, resposta, "respostas-sociais")
+                    }
+                    onDragOver={isEditMode ? handleDragOver : undefined}
+                    onDrop={(e) =>
+                      isEditMode && handleDrop(e, resposta, "respostas-sociais")
+                    }
                     onClick={() => !isEditMode && openResposta(resposta)}
-                    style={{ cursor: !isEditMode ? "pointer" : "default" }}
+                    style={{
+                      cursor: isEditMode && user ? "move" : "pointer",
+                      opacity: draggedItem?.id === resposta.id ? 0.5 : 1,
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) =>
@@ -2265,10 +2457,23 @@ const Home = ({ isEditMode = false }) => {
                   <div
                     key={noticia.id}
                     className="content-subsection noticia-item"
-                    onClick={() => openNews(noticia)}
+                    draggable={isEditMode && user ? true : false}
+                    onDragStart={(e) =>
+                      isEditMode && handleDragStart(e, noticia, "noticias")
+                    }
+                    onDragOver={isEditMode ? handleDragOver : undefined}
+                    onDrop={(e) =>
+                      isEditMode && handleDrop(e, noticia, "noticias")
+                    }
+                    onClick={() => !isEditMode && openNews(noticia)}
+                    style={{
+                      cursor: isEditMode && user ? "move" : "pointer",
+                      opacity: draggedItem?.id === noticia.id ? 0.5 : 1,
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) =>
+                      !isEditMode &&
                       !e.target.closest(".subsection-actions") &&
                       handleActionKeyDown(e, () => openNews(noticia))
                     }
@@ -2391,7 +2596,22 @@ const Home = ({ isEditMode = false }) => {
             ) : (
               <div className="transparency-grid">
                 {transparenciaDocs.map((doc) => (
-                  <div key={doc.id} className="transparency-card">
+                  <div
+                    key={doc.id}
+                    className="transparency-card"
+                    draggable={isEditMode && user ? true : false}
+                    onDragStart={(e) =>
+                      isEditMode && handleDragStart(e, doc, "transparencia")
+                    }
+                    onDragOver={isEditMode ? handleDragOver : undefined}
+                    onDrop={(e) =>
+                      isEditMode && handleDrop(e, doc, "transparencia")
+                    }
+                    style={{
+                      cursor: isEditMode && user ? "move" : "default",
+                      opacity: draggedItem?.id === doc.id ? 0.5 : 1,
+                    }}
+                  >
                     {isEditMode && user && (
                       <div className="transparency-actions">
                         <button
@@ -2520,7 +2740,29 @@ const Home = ({ isEditMode = false }) => {
                   /* Layout TEXTO - Mostra tudo expandido (como Valores) */
                   <div className="text-layout-content">
                     {itens.map((item) => (
-                      <div key={item.id} className="text-item-full">
+                      <div
+                        key={item.id}
+                        className="text-item-full"
+                        draggable={isEditMode && user ? true : false}
+                        onDragStart={(e) =>
+                          isEditMode &&
+                          handleDragStart(
+                            e,
+                            item,
+                            "secao-personalizada",
+                            secao.id,
+                          )
+                        }
+                        onDragOver={isEditMode ? handleDragOver : undefined}
+                        onDrop={(e) =>
+                          isEditMode &&
+                          handleDrop(e, item, "secao-personalizada", secao.id)
+                        }
+                        style={{
+                          cursor: isEditMode && user ? "move" : "default",
+                          opacity: draggedItem?.id === item.id ? 0.5 : 1,
+                        }}
+                      >
                         {isEditMode && user && (
                           <div
                             className="subsection-actions"
@@ -2631,16 +2873,41 @@ const Home = ({ isEditMode = false }) => {
                       <div
                         key={item.id}
                         className="gallery-item"
+                        draggable={isEditMode && user ? true : false}
+                        onDragStart={(e) =>
+                          isEditMode &&
+                          handleDragStart(
+                            e,
+                            item,
+                            "secao-personalizada",
+                            secao.id,
+                          )
+                        }
+                        onDragOver={isEditMode ? handleDragOver : undefined}
+                        onDrop={(e) =>
+                          isEditMode &&
+                          handleDrop(e, item, "secao-personalizada", secao.id)
+                        }
                         onClick={(e) => {
-                          // Não abrir se clicou num botão
-                          if (e.target.closest(".subsection-actions")) return;
+                          // Não abrir se clicou num botão ou em modo de edição
+                          if (
+                            e.target.closest(".subsection-actions") ||
+                            isEditMode
+                          )
+                            return;
                           openCustomItem(item);
                         }}
-                        style={{ cursor: "pointer" }}
+                        style={{
+                          cursor: isEditMode && user ? "move" : "pointer",
+                          opacity: draggedItem?.id === item.id ? 0.5 : 1,
+                        }}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
-                          if (!e.target.closest(".subsection-actions")) {
+                          if (
+                            !e.target.closest(".subsection-actions") &&
+                            !isEditMode
+                          ) {
                             handleActionKeyDown(e, () => openCustomItem(item));
                           }
                         }}
@@ -2711,16 +2978,41 @@ const Home = ({ isEditMode = false }) => {
                       <div
                         key={item.id}
                         className="list-item"
+                        draggable={isEditMode && user ? true : false}
+                        onDragStart={(e) =>
+                          isEditMode &&
+                          handleDragStart(
+                            e,
+                            item,
+                            "secao-personalizada",
+                            secao.id,
+                          )
+                        }
+                        onDragOver={isEditMode ? handleDragOver : undefined}
+                        onDrop={(e) =>
+                          isEditMode &&
+                          handleDrop(e, item, "secao-personalizada", secao.id)
+                        }
                         onClick={(e) => {
-                          // Não abrir se clicou num botão
-                          if (e.target.closest(".subsection-actions")) return;
+                          // Não abrir se clicou num botão ou em modo de edição
+                          if (
+                            e.target.closest(".subsection-actions") ||
+                            isEditMode
+                          )
+                            return;
                           openCustomItem(item);
                         }}
-                        style={{ cursor: "pointer" }}
+                        style={{
+                          cursor: isEditMode && user ? "move" : "pointer",
+                          opacity: draggedItem?.id === item.id ? 0.5 : 1,
+                        }}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
-                          if (!e.target.closest(".subsection-actions")) {
+                          if (
+                            !e.target.closest(".subsection-actions") &&
+                            !isEditMode
+                          ) {
                             handleActionKeyDown(e, () => openCustomItem(item));
                           }
                         }}
@@ -2829,9 +3121,28 @@ const Home = ({ isEditMode = false }) => {
                       <div
                         key={item.id}
                         className="content-subsection"
+                        draggable={isEditMode && user ? true : false}
+                        onDragStart={(e) =>
+                          isEditMode &&
+                          handleDragStart(
+                            e,
+                            item,
+                            "secao-personalizada",
+                            secao.id,
+                          )
+                        }
+                        onDragOver={isEditMode ? handleDragOver : undefined}
+                        onDrop={(e) =>
+                          isEditMode &&
+                          handleDrop(e, item, "secao-personalizada", secao.id)
+                        }
                         onClick={(e) => {
-                          // Não abrir se clicou num botão
-                          if (e.target.closest(".subsection-actions")) return;
+                          // Não abrir se clicou num botão ou em modo de edição
+                          if (
+                            e.target.closest(".subsection-actions") ||
+                            isEditMode
+                          )
+                            return;
                           if (item.link_externo) {
                             window.open(item.link_externo, "_blank");
                           } else {
@@ -2839,12 +3150,16 @@ const Home = ({ isEditMode = false }) => {
                           }
                         }}
                         style={{
-                          cursor: "pointer",
+                          cursor: isEditMode && user ? "move" : "pointer",
+                          opacity: draggedItem?.id === item.id ? 0.5 : 1,
                         }}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
-                          if (!e.target.closest(".subsection-actions")) {
+                          if (
+                            !e.target.closest(".subsection-actions") &&
+                            !isEditMode
+                          ) {
                             handleActionKeyDown(e, () => {
                               if (item.link_externo) {
                                 window.open(item.link_externo, "_blank");
