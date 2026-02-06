@@ -79,7 +79,6 @@ const serializeRespostaDestaques = (value) => {
 function RichTextEditor({ value, onChange }) {
   const editorRef = useRef(null);
   const savedRangeRef = useRef(null);
-  const [defaultFontLabel, setDefaultFontLabel] = useState("Tipo de letra");
   const [formats, setFormats] = useState({
     bold: false,
     italic: false,
@@ -173,38 +172,9 @@ function RichTextEditor({ value, onChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!editorRef.current || typeof window === "undefined") return;
-    try {
-      const fontFamily = window.getComputedStyle(editorRef.current).fontFamily;
-      const first =
-        fontFamily?.split(",")[0]?.replace(/['"]/g, "").trim() || "";
-      if (first) setDefaultFontLabel(first);
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
   return (
     <div className="richtext-editor">
       <div className="rt-toolbar">
-        <select
-          onChange={(e) => {
-            if (e.target.value === "__default") return;
-            exec("fontName", e.target.value);
-          }}
-          defaultValue="__default"
-          aria-label="Tipo de letra"
-        >
-          <option value="__default">{defaultFontLabel}</option>
-          <option value="Arial">Arial</option>
-          <option value="Verdana">Verdana</option>
-          <option value="Tahoma">Tahoma</option>
-          <option value="Trebuchet MS">Trebuchet MS</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Courier New">Courier New</option>
-        </select>
         <select
           onChange={(e) => exec("fontSize", e.target.value)}
           defaultValue=""
@@ -373,7 +343,6 @@ const validateImageFile = (file) =>
     }
     resolve({ ok: true });
   });
-
 
 const normalizeFormOptions = (opcoes = []) => {
   return opcoes.filter(Boolean).map((opt, idx) => {
@@ -2792,10 +2761,10 @@ const Home = ({ isEditMode = false }) => {
               ? formSelections[secao.id] || formOptions[0]?.tipo
               : formOptions[0]?.tipo
             : null;
-        const selectedFormLabel = formOptions.find(
-          (o) => o.tipo === selectedFormType,
-        )?.label;
-        const formKey = `${secao.id}-${selectedFormType || "none"}`;
+          const selectedFormLabel = formOptions.find(
+            (o) => o.tipo === selectedFormType,
+          )?.label;
+          const formKey = `${secao.id}-${selectedFormType || "none"}`;
 
           const crecheSections = secoesPersonalizadas.filter((s) => {
             const key = `${s.slug || ""} ${s.nome || ""} ${
@@ -3653,9 +3622,7 @@ const Home = ({ isEditMode = false }) => {
 
                             if (
                               ccInput?.value &&
-                              !/^\d{8,9}$/.test(
-                                normalizeDigits(ccInput.value),
-                              )
+                              !/^\d{8,9}$/.test(normalizeDigits(ccInput.value))
                             ) {
                               ccInput.setCustomValidity(
                                 "CC/BI deve ter 8 ou 9 dígitos",
@@ -3916,7 +3883,10 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
-                              {renderFieldError(formKey, "contacto_nome_completo")}
+                              {renderFieldError(
+                                formKey,
+                                "contacto_nome_completo",
+                              )}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`contacto_telefone-${secao.id}`}>
@@ -4121,9 +4091,7 @@ const Home = ({ isEditMode = false }) => {
 
                             if (
                               ccInput?.value &&
-                              !/^\d{8,9}$/.test(
-                                normalizeDigits(ccInput.value),
-                              )
+                              !/^\d{8,9}$/.test(normalizeDigits(ccInput.value))
                             ) {
                               ccInput.setCustomValidity(
                                 "CC/BI deve ter 8 ou 9 dígitos",
@@ -4857,9 +4825,7 @@ const Home = ({ isEditMode = false }) => {
 
                             if (
                               ccInput?.value &&
-                              !/^\d{8,9}$/.test(
-                                normalizeDigits(ccInput.value),
-                              )
+                              !/^\d{8,9}$/.test(normalizeDigits(ccInput.value))
                             ) {
                               ccInput.setCustomValidity(
                                 "CC/BI deve ter 8 ou 9 dígitos",
@@ -5132,7 +5098,10 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
-                              {renderFieldError(formKey, "contacto_nome_completo")}
+                              {renderFieldError(
+                                formKey,
+                                "contacto_nome_completo",
+                              )}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`contacto_telefone-${secao.id}`}>
@@ -5308,9 +5277,7 @@ const Home = ({ isEditMode = false }) => {
 
                             if (
                               ccInput?.value &&
-                              !/^\d{8,9}$/.test(
-                                normalizeDigits(ccInput.value),
-                              )
+                              !/^\d{8,9}$/.test(normalizeDigits(ccInput.value))
                             ) {
                               ccInput.setCustomValidity(
                                 "CC/BI deve ter 8 ou 9 dígitos",
@@ -5647,7 +5614,10 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
-                              {renderFieldError(formKey, "contacto_nome_completo")}
+                              {renderFieldError(
+                                formKey,
+                                "contacto_nome_completo",
+                              )}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`contacto_telefone-${secao.id}`}>
@@ -6481,8 +6451,7 @@ const Home = ({ isEditMode = false }) => {
                               onChange={async (e) => {
                                 const f = e.target.files[0];
                                 if (f) {
-                                  const validation =
-                                    await validateImageFile(f);
+                                  const validation = await validateImageFile(f);
                                   if (!validation.ok) {
                                     setImageWarning(
                                       "institucional",
@@ -6655,8 +6624,7 @@ const Home = ({ isEditMode = false }) => {
                               onChange={async (e) => {
                                 const f = e.target.files[0];
                                 if (f) {
-                                  const validation =
-                                    await validateImageFile(f);
+                                  const validation = await validateImageFile(f);
                                   if (!validation.ok) {
                                     setImageWarning(
                                       "hero",
