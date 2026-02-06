@@ -326,6 +326,31 @@ const DATE_MIN = "1900-01-01";
 const DATE_MAX = new Date().toISOString().slice(0, 10);
 const DATE_FUTURE_MAX = "2100-12-31";
 
+const normalizeDigits = (value = "") => value.replace(/\D/g, "");
+
+const isValidPostal = (value = "") =>
+  new RegExp(`^${POSTAL_PATTERN}$`).test(value.trim());
+
+const isValidPhone = (value = "") => normalizeDigits(value).length === 9;
+
+const isValidUtente = (value = "") => normalizeDigits(value).length === 9;
+
+const isValidNif = (value = "") => {
+  const digits = normalizeDigits(value);
+  if (digits.length !== 9) return false;
+  const nums = digits.split("").map((n) => Number(n));
+  let sum = 0;
+  for (let i = 0; i < 8; i += 1) {
+    sum += nums[i] * (9 - i);
+  }
+  let check = 11 - (sum % 11);
+  if (check >= 10) check = 0;
+  return check === nums[8];
+};
+
+const isValidNiss = (value = "") => normalizeDigits(value).length === 11;
+
+
 const normalizeFormOptions = (opcoes = []) => {
   return opcoes.filter(Boolean).map((opt, idx) => {
     const tipo = opt?.tipo || opt?.id || opt?.value || opt;
@@ -1804,6 +1829,12 @@ const Home = ({ isEditMode = false }) => {
 
   const alert = (message) => toast(message);
 
+  const clearFormError = (formKey, field) => {
+    if (!field) return;
+  };
+
+  const renderFieldError = () => null;
+
   useEffect(() => {
     if (showEditModal) {
       setTimeout(() => focusFirstElement(editModalRef), 0);
@@ -2683,9 +2714,10 @@ const Home = ({ isEditMode = false }) => {
               ? formSelections[secao.id] || formOptions[0]?.tipo
               : formOptions[0]?.tipo
             : null;
-          const selectedFormLabel = formOptions.find(
-            (o) => o.tipo === selectedFormType,
-          )?.label;
+        const selectedFormLabel = formOptions.find(
+          (o) => o.tipo === selectedFormType,
+        )?.label;
+        const formKey = `${secao.id}-${selectedFormType || "none"}`;
 
           const crecheSections = secoesPersonalizadas.filter((s) => {
             const key = `${s.slug || ""} ${s.nome || ""} ${
@@ -3380,9 +3412,16 @@ const Home = ({ isEditMode = false }) => {
                         <h3>{selectedFormLabel || "Envie-nos uma mensagem"}</h3>
                         <form
                           className="erpi-form"
+                          onInput={(e) => {
+                            if (e.target?.setCustomValidity) {
+                              e.target.setCustomValidity("");
+                            }
+                            clearFormError(formKey, e.target?.name);
+                          }}
                           onSubmit={async (e) => {
                             e.preventDefault();
                             const form = e.currentTarget;
+                            if (!form.reportValidity()) return;
                             const data = {
                               nome: form.nome.value,
                               email: form.email.value,
@@ -3483,6 +3522,12 @@ const Home = ({ isEditMode = false }) => {
                         <h3>{selectedFormLabel || "Formulário ERPI"}</h3>
                         <form
                           className="erpi-form"
+                          onInput={(e) => {
+                            if (e.target?.setCustomValidity) {
+                              e.target.setCustomValidity("");
+                            }
+                            clearFormError(formKey, e.target?.name);
+                          }}
                           onSubmit={async (e) => {
                             e.preventDefault();
                             const form = e.currentTarget;
@@ -3510,23 +3555,80 @@ const Home = ({ isEditMode = false }) => {
                                 selectedFormLabel || selectedFormType,
                             };
 
+                            const postalInput = form.codigo_postal;
+                            const ccInput = form.cc_bi_numero;
+                            const nifInput = form.nif;
+                            const nissInput = form.niss;
+                            const utenteInput = form.numero_utente;
+                            const telInput = form.contacto_telefone;
+
                             if (
-                              !data.nome_completo ||
-                              !data.data_nascimento ||
-                              !data.morada_completa ||
-                              !data.codigo_postal ||
-                              !data.concelho ||
-                              !data.distrito ||
-                              !data.cc_bi_numero ||
-                              !data.nif ||
-                              !data.niss ||
-                              !data.numero_utente ||
-                              !data.contacto_nome_completo ||
-                              !data.contacto_telefone ||
-                              !data.contacto_email ||
-                              !data.contacto_parentesco
+                              postalInput?.value &&
+                              !isValidPostal(postalInput.value)
                             ) {
-                              alert("Preencha todos os campos obrigatórios.");
+                              postalInput.setCustomValidity(
+                                "Código postal inválido (0000-000)",
+                              );
+                            } else if (postalInput) {
+                              postalInput.setCustomValidity("");
+                            }
+
+                            if (
+                              ccInput?.value &&
+                              !/^\d{8,9}$/.test(
+                                normalizeDigits(ccInput.value),
+                              )
+                            ) {
+                              ccInput.setCustomValidity(
+                                "CC/BI deve ter 8 ou 9 dígitos",
+                              );
+                            } else if (ccInput) {
+                              ccInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nifInput?.value &&
+                              !isValidNif(nifInput.value)
+                            ) {
+                              nifInput.setCustomValidity("NIF inválido");
+                            } else if (nifInput) {
+                              nifInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nissInput?.value &&
+                              !isValidNiss(nissInput.value)
+                            ) {
+                              nissInput.setCustomValidity(
+                                "NISS deve ter 11 dígitos",
+                              );
+                            } else if (nissInput) {
+                              nissInput.setCustomValidity("");
+                            }
+
+                            if (
+                              utenteInput?.value &&
+                              !isValidUtente(utenteInput.value)
+                            ) {
+                              utenteInput.setCustomValidity(
+                                "Nº utente deve ter 9 dígitos",
+                              );
+                            } else if (utenteInput) {
+                              utenteInput.setCustomValidity("");
+                            }
+
+                            if (
+                              telInput?.value &&
+                              !isValidPhone(telInput.value)
+                            ) {
+                              telInput.setCustomValidity(
+                                "Telefone deve ter 9 dígitos",
+                              );
+                            } else if (telInput) {
+                              telInput.setCustomValidity("");
+                            }
+
+                            if (!form.reportValidity()) {
                               return;
                             }
 
@@ -3560,6 +3662,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`data_nascimento-${secao.id}`}>
@@ -3576,6 +3679,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "data_nascimento")}
                             </div>
                           </div>
 
@@ -3593,6 +3697,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "morada_completa")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`codigo_postal-${secao.id}`}>
@@ -3609,6 +3714,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "codigo_postal")}
                             </div>
                           </div>
 
@@ -3626,6 +3732,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "concelho")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`distrito-${secao.id}`}>
@@ -3640,6 +3747,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "distrito")}
                             </div>
                           </div>
 
@@ -3654,9 +3762,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`cc_bi_numero-${secao.id}`}
                                   name="cc_bi_numero"
                                   placeholder="Número do CC/BI"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{8,9}"
+                                  title="CC/BI deve ter 8 ou 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "cc_bi_numero")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`nif-${secao.id}`}>NIF</label>
@@ -3666,9 +3778,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`nif-${secao.id}`}
                                   name="nif"
                                   placeholder="NIF"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="NIF deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "nif")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`niss-${secao.id}`}>NISS</label>
@@ -3678,9 +3794,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`niss-${secao.id}`}
                                   name="niss"
                                   placeholder="NISS"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{11}"
+                                  title="NISS deve ter 11 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "niss")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`numero_utente-${secao.id}`}>
@@ -3692,9 +3812,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`numero_utente-${secao.id}`}
                                   name="numero_utente"
                                   placeholder="Número de utente"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Nº utente deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "numero_utente")}
                             </div>
                           </div>
 
@@ -3714,6 +3838,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`contacto_telefone-${secao.id}`}>
@@ -3725,9 +3850,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`contacto_telefone-${secao.id}`}
                                   name="contacto_telefone"
                                   placeholder="Telefone"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Telefone deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_telefone")}
                             </div>
                           </div>
 
@@ -3746,6 +3875,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_email")}
                             </div>
                             <div className="form-field">
                               <label
@@ -3762,6 +3892,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_parentesco")}
                             </div>
                           </div>
 
@@ -3794,6 +3925,12 @@ const Home = ({ isEditMode = false }) => {
                         <h3>{selectedFormLabel || "Formulário Creche"}</h3>
                         <form
                           className="creche-form"
+                          onInput={(e) => {
+                            if (e.target?.setCustomValidity) {
+                              e.target.setCustomValidity("");
+                            }
+                            clearFormError(formKey, e.target?.name);
+                          }}
                           onSubmit={async (e) => {
                             e.preventDefault();
                             const form = e.currentTarget;
@@ -3811,8 +3948,9 @@ const Home = ({ isEditMode = false }) => {
                               selectedCrecheInput?.value ||
                               "";
 
-                            const crianca_nasceu =
-                              form.crianca_nasceu.value === "sim";
+                            const criancaNasceuValue =
+                              form.crianca_nasceu?.value || "";
+                            const crianca_nasceu = criancaNasceuValue === "sim";
 
                             const data = {
                               creche_opcao: creche_opcao_label,
@@ -3860,22 +3998,116 @@ const Home = ({ isEditMode = false }) => {
                                 selectedFormLabel || selectedFormType,
                             };
 
+                            const postalInput = form.codigo_postal;
+                            const maePostalInput = form.mae_codigo_postal;
+                            const paiPostalInput = form.pai_codigo_postal;
+                            const ccInput = form.cc_bi_numero;
+                            const nifInput = form.nif;
+                            const nissInput = form.niss;
+                            const utenteInput = form.numero_utente;
+                            const maeTelInput = form.mae_telemovel;
+                            const paiTelInput = form.pai_telemovel;
+
                             if (
-                              !data.nome_completo ||
-                              !data.morada ||
-                              !data.codigo_postal ||
-                              !data.localidade
+                              postalInput?.value &&
+                              !isValidPostal(postalInput.value)
                             ) {
-                              alert("Preencha os campos obrigatórios.");
-                              return;
+                              postalInput.setCustomValidity(
+                                "Código postal inválido (0000-000)",
+                              );
+                            } else if (postalInput) {
+                              postalInput.setCustomValidity("");
                             }
 
-                            if (crianca_nasceu && !data.data_nascimento) {
-                              alert("Indique a data de nascimento.");
-                              return;
+                            if (
+                              maePostalInput?.value &&
+                              !isValidPostal(maePostalInput.value)
+                            ) {
+                              maePostalInput.setCustomValidity(
+                                "Código postal inválido (0000-000)",
+                              );
+                            } else if (maePostalInput) {
+                              maePostalInput.setCustomValidity("");
                             }
-                            if (!crianca_nasceu && !data.data_prevista) {
-                              alert("Indique a data prevista.");
+
+                            if (
+                              paiPostalInput?.value &&
+                              !isValidPostal(paiPostalInput.value)
+                            ) {
+                              paiPostalInput.setCustomValidity(
+                                "Código postal inválido (0000-000)",
+                              );
+                            } else if (paiPostalInput) {
+                              paiPostalInput.setCustomValidity("");
+                            }
+
+                            if (
+                              ccInput?.value &&
+                              !/^\d{8,9}$/.test(
+                                normalizeDigits(ccInput.value),
+                              )
+                            ) {
+                              ccInput.setCustomValidity(
+                                "CC/BI deve ter 8 ou 9 dígitos",
+                              );
+                            } else if (ccInput) {
+                              ccInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nifInput?.value &&
+                              !isValidNif(nifInput.value)
+                            ) {
+                              nifInput.setCustomValidity("NIF inválido");
+                            } else if (nifInput) {
+                              nifInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nissInput?.value &&
+                              !isValidNiss(nissInput.value)
+                            ) {
+                              nissInput.setCustomValidity(
+                                "NISS deve ter 11 dígitos",
+                              );
+                            } else if (nissInput) {
+                              nissInput.setCustomValidity("");
+                            }
+
+                            if (
+                              utenteInput?.value &&
+                              !isValidUtente(utenteInput.value)
+                            ) {
+                              utenteInput.setCustomValidity(
+                                "Nº utente deve ter 9 dígitos",
+                              );
+                            } else if (utenteInput) {
+                              utenteInput.setCustomValidity("");
+                            }
+
+                            if (
+                              maeTelInput?.value &&
+                              !isValidPhone(maeTelInput.value)
+                            ) {
+                              maeTelInput.setCustomValidity(
+                                "Telemóvel deve ter 9 dígitos",
+                              );
+                            } else if (maeTelInput) {
+                              maeTelInput.setCustomValidity("");
+                            }
+
+                            if (
+                              paiTelInput?.value &&
+                              !isValidPhone(paiTelInput.value)
+                            ) {
+                              paiTelInput.setCustomValidity(
+                                "Telemóvel deve ter 9 dígitos",
+                              );
+                            } else if (paiTelInput) {
+                              paiTelInput.setCustomValidity("");
+                            }
+
+                            if (!form.reportValidity()) {
                               return;
                             }
 
@@ -3930,6 +4162,7 @@ const Home = ({ isEditMode = false }) => {
                                 </label>
                               ))}
                             </div>
+                            {renderFieldError(formKey, "creche_item_id")}
                           </div>
 
                           <div className="form-row">
@@ -3969,6 +4202,7 @@ const Home = ({ isEditMode = false }) => {
                                   </label>
                                 </div>
                               </fieldset>
+                              {renderFieldError(formKey, "crianca_nasceu")}
                             </div>
                           </div>
 
@@ -3986,6 +4220,7 @@ const Home = ({ isEditMode = false }) => {
                                   placeholder="Nome completo"
                                 />
                               </div>
+                              {renderFieldError(formKey, "nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-data-${secao.id}`}>
@@ -4012,6 +4247,12 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(
+                                formKey,
+                                crecheNasceuState[secao.id]
+                                  ? "data_nascimento"
+                                  : "data_prevista",
+                              )}
                             </div>
                           </div>
 
@@ -4029,6 +4270,7 @@ const Home = ({ isEditMode = false }) => {
                                   placeholder="Rua, nº, andar"
                                 />
                               </div>
+                              {renderFieldError(formKey, "morada")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-localidade-${secao.id}`}>
@@ -4043,6 +4285,7 @@ const Home = ({ isEditMode = false }) => {
                                   placeholder="Localidade"
                                 />
                               </div>
+                              {renderFieldError(formKey, "localidade")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-cp-${secao.id}`}>
@@ -4059,6 +4302,7 @@ const Home = ({ isEditMode = false }) => {
                                   title={POSTAL_TITLE}
                                 />
                               </div>
+                              {renderFieldError(formKey, "codigo_postal")}
                             </div>
                           </div>
 
@@ -4073,6 +4317,9 @@ const Home = ({ isEditMode = false }) => {
                                   id={`creche-cc-${secao.id}`}
                                   name="cc_bi_numero"
                                   placeholder="Número CC/BI"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{8,9}"
+                                  title="CC/BI deve ter 8 ou 9 dígitos"
                                 />
                               </div>
                             </div>
@@ -4086,8 +4333,12 @@ const Home = ({ isEditMode = false }) => {
                                   id={`creche-nif-${secao.id}`}
                                   name="nif"
                                   placeholder="NIF"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="NIF deve ter 9 dígitos"
                                 />
                               </div>
+                              {renderFieldError(formKey, "nif")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-niss-${secao.id}`}>
@@ -4099,8 +4350,12 @@ const Home = ({ isEditMode = false }) => {
                                   id={`creche-niss-${secao.id}`}
                                   name="niss"
                                   placeholder="NISS"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{11}"
+                                  title="NISS deve ter 11 dígitos"
                                 />
                               </div>
+                              {renderFieldError(formKey, "niss")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-utente-${secao.id}`}>
@@ -4112,8 +4367,12 @@ const Home = ({ isEditMode = false }) => {
                                   id={`creche-utente-${secao.id}`}
                                   name="numero_utente"
                                   placeholder="Número de utente"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Nº utente deve ter 9 dígitos"
                                 />
                               </div>
+                              {renderFieldError(formKey, "numero_utente")}
                             </div>
                           </div>
 
@@ -4202,6 +4461,7 @@ const Home = ({ isEditMode = false }) => {
                                   title={POSTAL_TITLE}
                                 />
                               </div>
+                              {renderFieldError(formKey, "mae_codigo_postal")}
                             </div>
                           </div>
                           <div className="form-row row-parent-contact">
@@ -4218,6 +4478,7 @@ const Home = ({ isEditMode = false }) => {
                                   placeholder="email@exemplo.pt"
                                 />
                               </div>
+                              {renderFieldError(formKey, "mae_email")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-mae-tel-${secao.id}`}>
@@ -4229,8 +4490,12 @@ const Home = ({ isEditMode = false }) => {
                                   id={`creche-mae-tel-${secao.id}`}
                                   name="mae_telemovel"
                                   placeholder="Telemóvel"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Telemóvel deve ter 9 dígitos"
                                 />
                               </div>
+                              {renderFieldError(formKey, "mae_telemovel")}
                             </div>
                           </div>
 
@@ -4318,6 +4583,7 @@ const Home = ({ isEditMode = false }) => {
                                   title={POSTAL_TITLE}
                                 />
                               </div>
+                              {renderFieldError(formKey, "pai_codigo_postal")}
                             </div>
                           </div>
                           <div className="form-row row-parent-contact">
@@ -4334,6 +4600,7 @@ const Home = ({ isEditMode = false }) => {
                                   placeholder="email@exemplo.pt"
                                 />
                               </div>
+                              {renderFieldError(formKey, "pai_email")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`creche-pai-tel-${secao.id}`}>
@@ -4345,8 +4612,12 @@ const Home = ({ isEditMode = false }) => {
                                   id={`creche-pai-tel-${secao.id}`}
                                   name="pai_telemovel"
                                   placeholder="Telemóvel"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Telemóvel deve ter 9 dígitos"
                                 />
                               </div>
+                              {renderFieldError(formKey, "pai_telemovel")}
                             </div>
                           </div>
 
@@ -4455,6 +4726,12 @@ const Home = ({ isEditMode = false }) => {
                         </h3>
                         <form
                           className="centro-dia-form"
+                          onInput={(e) => {
+                            if (e.target?.setCustomValidity) {
+                              e.target.setCustomValidity("");
+                            }
+                            clearFormError(formKey, e.target?.name);
+                          }}
                           onSubmit={async (e) => {
                             e.preventDefault();
                             const form = e.currentTarget;
@@ -4482,23 +4759,80 @@ const Home = ({ isEditMode = false }) => {
                                 selectedFormLabel || selectedFormType,
                             };
 
+                            const postalInput = form.codigo_postal;
+                            const ccInput = form.cc_bi_numero;
+                            const nifInput = form.nif;
+                            const nissInput = form.niss;
+                            const utenteInput = form.numero_utente;
+                            const telInput = form.contacto_telefone;
+
                             if (
-                              !data.nome_completo ||
-                              !data.data_nascimento ||
-                              !data.morada_completa ||
-                              !data.codigo_postal ||
-                              !data.concelho ||
-                              !data.distrito ||
-                              !data.cc_bi_numero ||
-                              !data.nif ||
-                              !data.niss ||
-                              !data.numero_utente ||
-                              !data.contacto_nome_completo ||
-                              !data.contacto_telefone ||
-                              !data.contacto_email ||
-                              !data.contacto_parentesco
+                              postalInput?.value &&
+                              !isValidPostal(postalInput.value)
                             ) {
-                              alert("Preencha todos os campos obrigatórios.");
+                              postalInput.setCustomValidity(
+                                "Código postal inválido (0000-000)",
+                              );
+                            } else if (postalInput) {
+                              postalInput.setCustomValidity("");
+                            }
+
+                            if (
+                              ccInput?.value &&
+                              !/^\d{8,9}$/.test(
+                                normalizeDigits(ccInput.value),
+                              )
+                            ) {
+                              ccInput.setCustomValidity(
+                                "CC/BI deve ter 8 ou 9 dígitos",
+                              );
+                            } else if (ccInput) {
+                              ccInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nifInput?.value &&
+                              !isValidNif(nifInput.value)
+                            ) {
+                              nifInput.setCustomValidity("NIF inválido");
+                            } else if (nifInput) {
+                              nifInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nissInput?.value &&
+                              !isValidNiss(nissInput.value)
+                            ) {
+                              nissInput.setCustomValidity(
+                                "NISS deve ter 11 dígitos",
+                              );
+                            } else if (nissInput) {
+                              nissInput.setCustomValidity("");
+                            }
+
+                            if (
+                              utenteInput?.value &&
+                              !isValidUtente(utenteInput.value)
+                            ) {
+                              utenteInput.setCustomValidity(
+                                "Nº utente deve ter 9 dígitos",
+                              );
+                            } else if (utenteInput) {
+                              utenteInput.setCustomValidity("");
+                            }
+
+                            if (
+                              telInput?.value &&
+                              !isValidPhone(telInput.value)
+                            ) {
+                              telInput.setCustomValidity(
+                                "Telefone deve ter 9 dígitos",
+                              );
+                            } else if (telInput) {
+                              telInput.setCustomValidity("");
+                            }
+
+                            if (!form.reportValidity()) {
                               return;
                             }
 
@@ -4544,6 +4878,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`data_nascimento-${secao.id}`}>
@@ -4560,6 +4895,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "data_nascimento")}
                             </div>
                           </div>
 
@@ -4577,6 +4913,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "morada_completa")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`codigo_postal-${secao.id}`}>
@@ -4593,6 +4930,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "codigo_postal")}
                             </div>
                           </div>
 
@@ -4610,6 +4948,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "concelho")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`distrito-${secao.id}`}>
@@ -4624,6 +4963,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "distrito")}
                             </div>
                           </div>
 
@@ -4638,9 +4978,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`cc_bi_numero-${secao.id}`}
                                   name="cc_bi_numero"
                                   placeholder="Número do CC/BI"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{8,9}"
+                                  title="CC/BI deve ter 8 ou 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "cc_bi_numero")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`nif-${secao.id}`}>NIF</label>
@@ -4650,9 +4994,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`nif-${secao.id}`}
                                   name="nif"
                                   placeholder="NIF"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="NIF deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "nif")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`niss-${secao.id}`}>NISS</label>
@@ -4662,9 +5010,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`niss-${secao.id}`}
                                   name="niss"
                                   placeholder="NISS"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{11}"
+                                  title="NISS deve ter 11 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "niss")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`numero_utente-${secao.id}`}>
@@ -4676,9 +5028,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`numero_utente-${secao.id}`}
                                   name="numero_utente"
                                   placeholder="Número de utente"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Nº utente deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "numero_utente")}
                             </div>
                           </div>
 
@@ -4698,6 +5054,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`contacto_telefone-${secao.id}`}>
@@ -4709,9 +5066,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`contacto_telefone-${secao.id}`}
                                   name="contacto_telefone"
                                   placeholder="Telefone"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Telefone deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_telefone")}
                             </div>
                           </div>
 
@@ -4730,6 +5091,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_email")}
                             </div>
                             <div className="form-field">
                               <label
@@ -4746,6 +5108,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_parentesco")}
                             </div>
                           </div>
 
@@ -4778,6 +5141,12 @@ const Home = ({ isEditMode = false }) => {
                         <h3>{selectedFormLabel || "Formulário SAD"}</h3>
                         <form
                           className="sad-form"
+                          onInput={(e) => {
+                            if (e.target?.setCustomValidity) {
+                              e.target.setCustomValidity("");
+                            }
+                            clearFormError(formKey, e.target?.name);
+                          }}
                           onSubmit={async (e) => {
                             e.preventDefault();
                             const form = e.currentTarget;
@@ -4841,23 +5210,156 @@ const Home = ({ isEditMode = false }) => {
                                 selectedFormLabel || selectedFormType,
                             };
 
+                            const postalInput = form.codigo_postal;
+                            const ccInput = form.cc_bi_numero;
+                            const nifInput = form.nif;
+                            const nissInput = form.niss;
+                            const utenteInput = form.numero_utente;
+                            const telInput = form.contacto_telefone;
+
                             if (
-                              !data.nome_completo ||
-                              !data.data_nascimento ||
-                              !data.morada_completa ||
-                              !data.codigo_postal ||
-                              !data.concelho ||
-                              !data.distrito ||
-                              !data.cc_bi_numero ||
-                              !data.nif ||
-                              !data.niss ||
-                              !data.numero_utente ||
-                              !data.contacto_nome_completo ||
-                              !data.contacto_telefone ||
-                              !data.contacto_email ||
-                              !data.contacto_parentesco
+                              postalInput?.value &&
+                              !isValidPostal(postalInput.value)
                             ) {
-                              alert("Preencha todos os campos obrigatórios.");
+                              postalInput.setCustomValidity(
+                                "Código postal inválido (0000-000)",
+                              );
+                            } else if (postalInput) {
+                              postalInput.setCustomValidity("");
+                            }
+
+                            if (
+                              ccInput?.value &&
+                              !/^\d{8,9}$/.test(
+                                normalizeDigits(ccInput.value),
+                              )
+                            ) {
+                              ccInput.setCustomValidity(
+                                "CC/BI deve ter 8 ou 9 dígitos",
+                              );
+                            } else if (ccInput) {
+                              ccInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nifInput?.value &&
+                              !isValidNif(nifInput.value)
+                            ) {
+                              nifInput.setCustomValidity("NIF inválido");
+                            } else if (nifInput) {
+                              nifInput.setCustomValidity("");
+                            }
+
+                            if (
+                              nissInput?.value &&
+                              !isValidNiss(nissInput.value)
+                            ) {
+                              nissInput.setCustomValidity(
+                                "NISS deve ter 11 dígitos",
+                              );
+                            } else if (nissInput) {
+                              nissInput.setCustomValidity("");
+                            }
+
+                            if (
+                              utenteInput?.value &&
+                              !isValidUtente(utenteInput.value)
+                            ) {
+                              utenteInput.setCustomValidity(
+                                "Nº utente deve ter 9 dígitos",
+                              );
+                            } else if (utenteInput) {
+                              utenteInput.setCustomValidity("");
+                            }
+
+                            if (
+                              telInput?.value &&
+                              !isValidPhone(telInput.value)
+                            ) {
+                              telInput.setCustomValidity(
+                                "Telefone deve ter 9 dígitos",
+                              );
+                            } else if (telInput) {
+                              telInput.setCustomValidity("");
+                            }
+
+                            const periodicidadeHP =
+                              form.periodicidade_higiene_pessoal;
+                            const vezesHP = form.vezes_higiene_pessoal;
+                            const periodicidadeHH =
+                              form.periodicidade_higiene_habitacional;
+                            const vezesHH = form.vezes_higiene_habitacional;
+                            const periodicidadeR = form.periodicidade_refeicoes;
+                            const vezesR = form.vezes_refeicoes;
+                            const periodicidadeTR =
+                              form.periodicidade_tratamento_roupa;
+                            const vezesTR = form.vezes_tratamento_roupa;
+
+                            if (data.higiene_pessoal) {
+                              if (periodicidadeHP && !periodicidadeHP.value) {
+                                periodicidadeHP.setCustomValidity(
+                                  "Selecione a periodicidade",
+                                );
+                              }
+                              if (vezesHP && !vezesHP.value) {
+                                vezesHP.setCustomValidity(
+                                  "Indique as vezes por dia",
+                                );
+                              }
+                            } else {
+                              periodicidadeHP?.setCustomValidity("");
+                              vezesHP?.setCustomValidity("");
+                            }
+
+                            if (data.higiene_habitacional) {
+                              if (periodicidadeHH && !periodicidadeHH.value) {
+                                periodicidadeHH.setCustomValidity(
+                                  "Selecione a periodicidade",
+                                );
+                              }
+                              if (vezesHH && !vezesHH.value) {
+                                vezesHH.setCustomValidity(
+                                  "Indique as vezes por dia",
+                                );
+                              }
+                            } else {
+                              periodicidadeHH?.setCustomValidity("");
+                              vezesHH?.setCustomValidity("");
+                            }
+
+                            if (data.refeicoes) {
+                              if (periodicidadeR && !periodicidadeR.value) {
+                                periodicidadeR.setCustomValidity(
+                                  "Selecione a periodicidade",
+                                );
+                              }
+                              if (vezesR && !vezesR.value) {
+                                vezesR.setCustomValidity(
+                                  "Indique as vezes por dia",
+                                );
+                              }
+                            } else {
+                              periodicidadeR?.setCustomValidity("");
+                              vezesR?.setCustomValidity("");
+                            }
+
+                            if (data.tratamento_roupa) {
+                              if (periodicidadeTR && !periodicidadeTR.value) {
+                                periodicidadeTR.setCustomValidity(
+                                  "Selecione a periodicidade",
+                                );
+                              }
+                              if (vezesTR && !vezesTR.value) {
+                                vezesTR.setCustomValidity(
+                                  "Indique as vezes por dia",
+                                );
+                              }
+                            } else {
+                              periodicidadeTR?.setCustomValidity("");
+                              vezesTR?.setCustomValidity("");
+                            }
+
+                            if (!form.reportValidity()) {
                               return;
                             }
 
@@ -4891,6 +5393,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`data_nascimento-${secao.id}`}>
@@ -4907,6 +5410,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "data_nascimento")}
                             </div>
                           </div>
 
@@ -4924,6 +5428,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "morada_completa")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`codigo_postal-${secao.id}`}>
@@ -4940,6 +5445,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "codigo_postal")}
                             </div>
                           </div>
 
@@ -4957,6 +5463,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "concelho")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`distrito-${secao.id}`}>
@@ -4971,6 +5478,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "distrito")}
                             </div>
                           </div>
 
@@ -4985,9 +5493,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`cc_bi_numero-${secao.id}`}
                                   name="cc_bi_numero"
                                   placeholder="Número do CC/BI"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{8,9}"
+                                  title="CC/BI deve ter 8 ou 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "cc_bi_numero")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`nif-${secao.id}`}>NIF</label>
@@ -4997,9 +5509,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`nif-${secao.id}`}
                                   name="nif"
                                   placeholder="NIF"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="NIF deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "nif")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`niss-${secao.id}`}>NISS</label>
@@ -5009,9 +5525,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`niss-${secao.id}`}
                                   name="niss"
                                   placeholder="NISS"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{11}"
+                                  title="NISS deve ter 11 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "niss")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`numero_utente-${secao.id}`}>
@@ -5023,9 +5543,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`numero_utente-${secao.id}`}
                                   name="numero_utente"
                                   placeholder="Número de utente"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Nº utente deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "numero_utente")}
                             </div>
                           </div>
 
@@ -5045,6 +5569,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_nome_completo")}
                             </div>
                             <div className="form-field">
                               <label htmlFor={`contacto_telefone-${secao.id}`}>
@@ -5056,9 +5581,13 @@ const Home = ({ isEditMode = false }) => {
                                   id={`contacto_telefone-${secao.id}`}
                                   name="contacto_telefone"
                                   placeholder="Telefone"
+                                  inputMode="numeric"
+                                  pattern="[0-9]{9}"
+                                  title="Telefone deve ter 9 dígitos"
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_telefone")}
                             </div>
                           </div>
 
@@ -5077,6 +5606,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_email")}
                             </div>
                             <div className="form-field">
                               <label
@@ -5093,6 +5623,7 @@ const Home = ({ isEditMode = false }) => {
                                   required
                                 />
                               </div>
+                              {renderFieldError(formKey, "contacto_parentesco")}
                             </div>
                           </div>
 
@@ -5156,6 +5687,10 @@ const Home = ({ isEditMode = false }) => {
                                         Segunda a domingo
                                       </option>
                                     </select>
+                                    {renderFieldError(
+                                      formKey,
+                                      "periodicidade_higiene_pessoal",
+                                    )}
                                   </div>
                                   <div className="form-field">
                                     <label
@@ -5171,6 +5706,10 @@ const Home = ({ isEditMode = false }) => {
                                       max="5"
                                       placeholder="1-5"
                                     />
+                                    {renderFieldError(
+                                      formKey,
+                                      "vezes_higiene_pessoal",
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -5221,6 +5760,10 @@ const Home = ({ isEditMode = false }) => {
                                         Segunda a domingo
                                       </option>
                                     </select>
+                                    {renderFieldError(
+                                      formKey,
+                                      "periodicidade_higiene_habitacional",
+                                    )}
                                   </div>
                                   <div className="form-field">
                                     <label
@@ -5236,6 +5779,10 @@ const Home = ({ isEditMode = false }) => {
                                       max="5"
                                       placeholder="1-5"
                                     />
+                                    {renderFieldError(
+                                      formKey,
+                                      "vezes_higiene_habitacional",
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -5289,6 +5836,10 @@ const Home = ({ isEditMode = false }) => {
                                         Segunda a domingo
                                       </option>
                                     </select>
+                                    {renderFieldError(
+                                      formKey,
+                                      "periodicidade_refeicoes",
+                                    )}
                                   </div>
                                   <div className="form-field">
                                     <label
@@ -5304,6 +5855,10 @@ const Home = ({ isEditMode = false }) => {
                                       max="5"
                                       placeholder="1-5"
                                     />
+                                    {renderFieldError(
+                                      formKey,
+                                      "vezes_refeicoes",
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -5354,6 +5909,10 @@ const Home = ({ isEditMode = false }) => {
                                         Segunda a domingo
                                       </option>
                                     </select>
+                                    {renderFieldError(
+                                      formKey,
+                                      "periodicidade_tratamento_roupa",
+                                    )}
                                   </div>
                                   <div className="form-field">
                                     <label
@@ -5369,6 +5928,10 @@ const Home = ({ isEditMode = false }) => {
                                       max="5"
                                       placeholder="1-5"
                                     />
+                                    {renderFieldError(
+                                      formKey,
+                                      "vezes_tratamento_roupa",
+                                    )}
                                   </div>
                                 </div>
                               </div>
