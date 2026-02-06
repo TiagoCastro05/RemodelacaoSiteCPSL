@@ -1,6 +1,31 @@
 import React, { useRef, useState, useEffect } from "react";
 import "../styles/RichTextEditor.css";
 
+const IMAGE_MAX_MB = 3;
+
+const validateImageFile = (file) =>
+  new Promise((resolve) => {
+    if (!file) {
+      resolve({ ok: false, message: "Selecione uma imagem válida." });
+      return;
+    }
+    if (!file.type?.startsWith("image/")) {
+      resolve({
+        ok: false,
+        message: "Ficheiro inválido. Envie uma imagem (JPG/PNG).",
+      });
+      return;
+    }
+    if (file.size > IMAGE_MAX_MB * 1024 * 1024) {
+      resolve({
+        ok: false,
+        message: `A imagem excede ${IMAGE_MAX_MB} MB.`,
+      });
+      return;
+    }
+    resolve({ ok: true });
+  });
+
 function RichTextEditor({ value, onChange, api }) {
   const editorRef = useRef(null);
   const isUserTyping = useRef(false);
@@ -167,6 +192,15 @@ function RichTextEditor({ value, onChange, api }) {
       if (!file) return;
 
       try {
+        const validation = await validateImageFile(file);
+        if (!validation.ok) {
+          window.alert(
+            validation.message ||
+              `A imagem deve ter no máximo ${IMAGE_MAX_MB} MB.`,
+          );
+          return;
+        }
+
         const formData = new FormData();
         formData.append("file", file);
         formData.append("tabela_referencia", "content_images");

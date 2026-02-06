@@ -5,6 +5,31 @@ import RichTextEditor from "../components/RichTextEditor";
 import api from "../services/api";
 import "../styles/Dashboard.css";
 
+const IMAGE_MAX_MB = 3;
+
+const validateImageFile = (file) =>
+  new Promise((resolve) => {
+    if (!file) {
+      resolve({ ok: false, message: "Selecione uma imagem válida." });
+      return;
+    }
+    if (!file.type?.startsWith("image/")) {
+      resolve({
+        ok: false,
+        message: "Ficheiro inválido. Envie uma imagem (JPG/PNG).",
+      });
+      return;
+    }
+    if (file.size > IMAGE_MAX_MB * 1024 * 1024) {
+      resolve({
+        ok: false,
+        message: `A imagem excede ${IMAGE_MAX_MB} MB.`,
+      });
+      return;
+    }
+    resolve({ ok: true });
+  });
+
 function SectionItemsManagement() {
   const { secaoId } = useParams();
   const navigate = useNavigate();
@@ -14,6 +39,7 @@ function SectionItemsManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [imageWarning, setImageWarning] = useState("");
   const [formData, setFormData] = useState({
     titulo: "",
     subtitulo: "",
@@ -84,6 +110,16 @@ function SectionItemsManagement() {
 
   const uploadImage = async (file) => {
     try {
+      const validation = await validateImageFile(file);
+      if (!validation.ok) {
+        setImageWarning(
+          validation.message ||
+            `A imagem deve ter no máximo ${IMAGE_MAX_MB} MB.`,
+        );
+        return;
+      }
+      setImageWarning("");
+
       const formDataUpload = new FormData();
       formDataUpload.append("file", file);
       formDataUpload.append("tabela_referencia", "itens_secoes_personalizadas");
@@ -289,7 +325,12 @@ function SectionItemsManagement() {
                             if (f) await uploadImage(f);
                           }}
                         />
-                        <small className="hint">Enviar imagem</small>
+                        <small className="hint">
+                          Enviar imagem (máx. {IMAGE_MAX_MB} MB)
+                        </small>
+                        {imageWarning && (
+                          <div className="file-warning">{imageWarning}</div>
+                        )}
                       </div>
                     </div>
                   </label>

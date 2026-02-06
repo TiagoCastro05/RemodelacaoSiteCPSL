@@ -608,3 +608,9 @@
   gap: 10px;
   justify-content: flex-end;
 }
+
+.file-warning {
+  margin-top: 6px;
+  color: #b45309;
+  font-size: 0.85rem;
+}

@@ -325,6 +325,7 @@ const POSTAL_TITLE = "Formato 0000-000";
 const DATE_MIN = "1900-01-01";
 const DATE_MAX = new Date().toISOString().slice(0, 10);
 const DATE_FUTURE_MAX = "2100-12-31";
+const IMAGE_MAX_MB = 3;
 
 const normalizeDigits = (value = "") => value.replace(/\D/g, "");
 
@@ -349,6 +350,29 @@ const isValidNif = (value = "") => {
 };
 
 const isValidNiss = (value = "") => normalizeDigits(value).length === 11;
+
+const validateImageFile = (file) =>
+  new Promise((resolve) => {
+    if (!file) {
+      resolve({ ok: false, message: "Selecione uma imagem válida." });
+      return;
+    }
+    if (!file.type?.startsWith("image/")) {
+      resolve({
+        ok: false,
+        message: "Ficheiro inválido. Envie uma imagem (JPG/PNG).",
+      });
+      return;
+    }
+    if (file.size > IMAGE_MAX_MB * 1024 * 1024) {
+      resolve({
+        ok: false,
+        message: `A imagem excede ${IMAGE_MAX_MB} MB.`,
+      });
+      return;
+    }
+    resolve({ ok: true });
+  });
 
 
 const normalizeFormOptions = (opcoes = []) => {
@@ -409,6 +433,7 @@ const Home = ({ isEditMode = false }) => {
   const [existingMedia, setExistingMedia] = useState([]);
   const [pendingMediaFiles, setPendingMediaFiles] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [imageWarnings, setImageWarnings] = useState({});
   const [confirmState, setConfirmState] = useState({
     open: false,
     message: "",
@@ -489,10 +514,34 @@ const Home = ({ isEditMode = false }) => {
     setExistingMedia([]);
   };
 
-  const addPendingMediaFiles = (files) => {
+  const addPendingMediaFiles = async (files) => {
     if (!files || !files.length) return;
+    const accepted = [];
+    const rejected = [];
+
+    for (const file of Array.from(files)) {
+      const validation = await validateImageFile(file);
+      if (!validation.ok) {
+        rejected.push(validation.message || "Imagem inválida.");
+      } else {
+        accepted.push(file);
+      }
+    }
+
+    if (rejected.length) {
+      setImageWarning(
+        "gallery",
+        rejected.length === 1
+          ? rejected[0]
+          : `Algumas imagens não foram aceites. Limite: ${IMAGE_MAX_MB} MB.`,
+      );
+    } else {
+      clearImageWarning("gallery");
+    }
+
+    if (!accepted.length) return;
     const stamp = Date.now();
-    const mapped = Array.from(files).map((file, index) => ({
+    const mapped = accepted.map((file, index) => ({
       id: `${stamp}-${index}-${file.name}`,
       file,
       preview: URL.createObjectURL(file),
@@ -756,13 +805,18 @@ const Home = ({ isEditMode = false }) => {
               accept="image/*"
               multiple
               className="file-input-hidden"
-              onChange={(e) => {
-                addPendingMediaFiles(e.target.files);
+              onChange={async (e) => {
+                await addPendingMediaFiles(e.target.files);
                 e.target.value = "";
               }}
             />
           </span>
-          <small className="hint">Pode selecionar varias imagens</small>
+          <small className="hint">
+            Pode selecionar várias imagens (máx. {IMAGE_MAX_MB} MB cada)
+          </small>
+          {imageWarnings.gallery && (
+            <div className="file-warning">{imageWarnings.gallery}</div>
+          )}
         </label>
 
         {mediaLoading && <small>A carregar fotografias...</small>}
@@ -920,6 +974,17 @@ const Home = ({ isEditMode = false }) => {
   // Upload cover image (imagem_destaque) and set editingData.imagem_destaque
   const uploadCoverImage = async (file) => {
     try {
+      const validation = await validateImageFile(file);
+      if (!validation.ok) {
+        setImageWarning(
+          "cover",
+          validation.message ||
+            `A imagem deve ter no máximo ${IMAGE_MAX_MB} MB.`,
+        );
+        return;
+      }
+      clearImageWarning("cover");
+
       // show placeholder immediately while upload runs
       const placeholderBase =
         api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
@@ -1828,6 +1893,19 @@ const Home = ({ isEditMode = false }) => {
   };
 
   const alert = (message) => toast(message);
+
+  const setImageWarning = (key, message) => {
+    setImageWarnings((prev) => ({ ...prev, [key]: message }));
+  };
+
+  const clearImageWarning = (key) => {
+    setImageWarnings((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
   const clearFormError = (formKey, field) => {
     if (!field) return;
@@ -6403,6 +6481,18 @@ const Home = ({ isEditMode = false }) => {
                               onChange={async (e) => {
                                 const f = e.target.files[0];
                                 if (f) {
+                                  const validation =
+                                    await validateImageFile(f);
+                                  if (!validation.ok) {
+                                    setImageWarning(
+                                      "institucional",
+                                      validation.message ||
+                                        `A imagem deve ter no máximo ${IMAGE_MAX_MB} MB.`,
+                                    );
+                                    e.target.value = "";
+                                    return;
+                                  }
+                                  clearImageWarning("institucional");
                                   try {
                                     const formData = new FormData();
                                     formData.append("file", f);
@@ -6446,7 +6536,14 @@ const Home = ({ isEditMode = false }) => {
                               }}
                             />
                           </span>
-                          <small className="hint">Enviar imagem de capa</small>
+                          <small className="hint">
+                            Enviar imagem de capa (máx. {IMAGE_MAX_MB} MB)
+                          </small>
+                          {imageWarnings.institucional && (
+                            <div className="file-warning">
+                              {imageWarnings.institucional}
+                            </div>
+                          )}
                           {editingData.imagem && (
                             <button
                               type="button"
@@ -6558,6 +6655,18 @@ const Home = ({ isEditMode = false }) => {
                               onChange={async (e) => {
                                 const f = e.target.files[0];
                                 if (f) {
+                                  const validation =
+                                    await validateImageFile(f);
+                                  if (!validation.ok) {
+                                    setImageWarning(
+                                      "hero",
+                                      validation.message ||
+                                        `A imagem deve ter no máximo ${IMAGE_MAX_MB} MB.`,
+                                    );
+                                    e.target.value = "";
+                                    return;
+                                  }
+                                  clearImageWarning("hero");
                                   try {
                                     const formData = new FormData();
                                     formData.append("file", f);
@@ -6605,8 +6714,13 @@ const Home = ({ isEditMode = false }) => {
                             />
                           </span>
                           <small className="hint">
-                            Enviar imagem de fundo (recomendado: 1920x1080px)
+                            Enviar imagem de fundo (máx. {IMAGE_MAX_MB} MB)
                           </small>
+                          {imageWarnings.hero && (
+                            <div className="file-warning">
+                              {imageWarnings.hero}
+                            </div>
+                          )}
                           {editingData.imagem_fundo && (
                             <button
                               type="button"
@@ -6713,7 +6827,14 @@ const Home = ({ isEditMode = false }) => {
                               }}
                             />
                           </span>
-                          <small className="hint">Enviar imagem de capa</small>
+                          <small className="hint">
+                            Enviar imagem de capa (máx. {IMAGE_MAX_MB} MB)
+                          </small>
+                          {imageWarnings.cover && (
+                            <div className="file-warning">
+                              {imageWarnings.cover}
+                            </div>
+                          )}
                           {editingData.imagem_destaque && (
                             <button
                               type="button"
@@ -6849,7 +6970,14 @@ const Home = ({ isEditMode = false }) => {
                               }}
                             />
                           </span>
-                          <small className="hint">Enviar imagem</small>
+                          <small className="hint">
+                            Enviar imagem (máx. {IMAGE_MAX_MB} MB)
+                          </small>
+                          {imageWarnings.cover && (
+                            <div className="file-warning">
+                              {imageWarnings.cover}
+                            </div>
+                          )}
                           {editingData.imagem && (
                             <button
                               type="button"
@@ -7558,8 +7686,13 @@ const Home = ({ isEditMode = false }) => {
                               />
                             </span>
                             <small className="hint">
-                              Enviar imagem de capa (aparece antes do título)
+                              Enviar imagem de capa (máx. {IMAGE_MAX_MB} MB)
                             </small>
+                            {imageWarnings.cover && (
+                              <div className="file-warning">
+                                {imageWarnings.cover}
+                              </div>
+                            )}
                             {(editingSecaoPersonalizada
                               ? editingData.imagem
                               : editingData.imagem_destaque) && (
