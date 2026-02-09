@@ -10,7 +10,9 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const navScrollRef = useRef(null);
+  const prevMenuLenRef = useRef(null);
   const location = useLocation();
+  const forceArrows = customSections.length >= 3;
 
   // Seções padrão caso não sejam fornecidas
   const defaultSections = [
@@ -54,17 +56,36 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
     const el = navScrollRef.current;
     if (!el) return undefined;
 
+    if (prevMenuLenRef.current === null) {
+      prevMenuLenRef.current = menuSections.length;
+    } else if (prevMenuLenRef.current !== menuSections.length) {
+      el.scrollLeft = 0;
+      prevMenuLenRef.current = menuSections.length;
+    }
+
     const update = () => {
       const { scrollLeft, scrollWidth, clientWidth } = el;
-      if (scrollWidth <= clientWidth + 1) {
+      const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
+      const hasOverflow = maxScrollLeft > 1;
+
+      if (!hasOverflow) {
         // sem overflow: garantir alinhamento normal
         if (scrollLeft !== 0) el.scrollLeft = 0;
+        setCanScrollLeft(false);
+        setCanScrollRight(false);
+        return;
       }
+
+      if (scrollLeft > maxScrollLeft) el.scrollLeft = maxScrollLeft;
       setCanScrollLeft(scrollLeft > 4);
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+      setCanScrollRight(maxScrollLeft - scrollLeft > 4);
     };
 
     update();
+    const raf = requestAnimationFrame(update);
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready.then(update).catch(() => {});
+    }
     el.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
 
@@ -78,6 +99,7 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
       el.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
       if (ro) ro.disconnect();
+      cancelAnimationFrame(raf);
     };
   }, [menuSections.length, isMobileMenuOpen]);
 
@@ -217,13 +239,13 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
           id="main-navigation"
           className={`main-nav ${isMobileMenuOpen ? "mobile-open" : ""}`}
         >
-          {(canScrollLeft || canScrollRight) && (
+          {(forceArrows || canScrollLeft || canScrollRight) && (
             <button
               type="button"
               className="nav-scroll-btn left"
               onClick={() => scrollNav(-1)}
               aria-label="Scroll menu para a esquerda"
-              disabled={!canScrollLeft}
+              disabled={!canScrollLeft && !forceArrows}
             >
               ‹
             </button>
@@ -249,13 +271,13 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
               ))}
             </ul>
           </div>
-          {(canScrollLeft || canScrollRight) && (
+          {(forceArrows || canScrollLeft || canScrollRight) && (
             <button
               type="button"
               className="nav-scroll-btn right"
               onClick={() => scrollNav(1)}
               aria-label="Scroll menu para a direita"
-              disabled={!canScrollRight}
+              disabled={!canScrollRight && !forceArrows}
             >
               ›
             </button>
