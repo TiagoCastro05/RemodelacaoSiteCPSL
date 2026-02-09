@@ -71,12 +71,38 @@
 }
 
 /* Navegação */
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.nav-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nav-scroll:focus-visible {
+  outline: 2px solid #3498db;
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
 .main-nav ul {
   display: flex;
   list-style: none;
   margin: 0;
   padding: 0;
   gap: 2rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  justify-content: flex-end;
 }
 
 .main-nav li {
@@ -91,6 +117,7 @@
   padding: 0.5rem 0;
   position: relative;
   transition: color 0.3s ease;
+  white-space: nowrap;
 }
 
 .main-nav a:hover {
@@ -110,6 +137,35 @@
 
 .main-nav a:hover::after {
   width: 100%;
+}
+
+.nav-scroll-btn {
+  border: 1px solid #dcdcdc;
+  background: #ffffff;
+  color: #2c3e50;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-scroll-btn:hover:not(:disabled) {
+  border-color: #3498db;
+  color: #3498db;
+}
+
+.nav-scroll-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.nav-scroll-btn:focus-visible {
+  outline: 2px solid #3498db;
+  outline-offset: 2px;
 }
 
 /* Botão menu mobile */
@@ -190,6 +246,7 @@
     overflow: hidden;
     transition: max-height 0.3s ease, box-shadow 0.3s ease;
     box-shadow: none;
+    flex: none;
   }
 
   .main-nav.mobile-open {
@@ -201,6 +258,19 @@
     flex-direction: column;
     gap: 0;
     padding: 1rem 0;
+    white-space: normal;
+    justify-content: flex-start;
+  }
+
+  .nav-scroll-btn {
+    display: none;
+  }
+
+  .nav-scroll {
+    width: 100%;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .main-nav li {

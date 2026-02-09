@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import "../styles/Header.css";
 import logo from "../img/logo.png";
@@ -7,6 +7,9 @@ import logo from "../img/logo.png";
 const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const navScrollRef = useRef(null);
   const location = useLocation();
 
   // Seções padrão caso não sejam fornecidas
@@ -45,6 +48,74 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Atualiza estado das setas do menu (scroll horizontal)
+  useEffect(() => {
+    const el = navScrollRef.current;
+    if (!el) return undefined;
+
+    const update = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      if (scrollWidth <= clientWidth + 1) {
+        // sem overflow: garantir alinhamento normal
+        if (scrollLeft !== 0) el.scrollLeft = 0;
+      }
+      setCanScrollLeft(scrollLeft > 4);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+    };
+
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(update);
+      ro.observe(el);
+    }
+
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      if (ro) ro.disconnect();
+    };
+  }, [menuSections.length, isMobileMenuOpen]);
+
+  const scrollNav = (direction) => {
+    const el = navScrollRef.current;
+    if (!el) return;
+    const amount = Math.round(el.clientWidth * 0.7);
+    el.scrollBy({ left: direction * amount, behavior: "smooth" });
+  };
+
+  const handleNavKeyDown = (e) => {
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      scrollNav(1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      scrollNav(-1);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      const el = navScrollRef.current;
+      if (el) el.scrollTo({ left: 0, behavior: "smooth" });
+    } else if (e.key === "End") {
+      e.preventDefault();
+      const el = navScrollRef.current;
+      if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+    }
+  };
+
+  const handleNavFocus = (e) => {
+    const target = e.target;
+    if (target && target.tagName === "A") {
+      target.scrollIntoView({
+        behavior: "smooth",
+        inline: "nearest",
+        block: "nearest",
+      });
+    }
+  };
 
   // Click em item do menu (scroll suave ou navegacao)
   const handleNavClick = (e, sectionId) => {
@@ -146,18 +217,49 @@ const Header = ({ sections = [], customSections = [], isEditMode = false }) => {
           id="main-navigation"
           className={`main-nav ${isMobileMenuOpen ? "mobile-open" : ""}`}
         >
-          <ul>
-            {menuSections.map((section) => (
-              <li key={section.id}>
-                <a
-                  href={`#${section.id}`}
-                  onClick={(e) => handleNavClick(e, section.id)}
-                >
-                  {section.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+          {(canScrollLeft || canScrollRight) && (
+            <button
+              type="button"
+              className="nav-scroll-btn left"
+              onClick={() => scrollNav(-1)}
+              aria-label="Scroll menu para a esquerda"
+              disabled={!canScrollLeft}
+            >
+              ‹
+            </button>
+          )}
+          <div
+            className="nav-scroll"
+            ref={navScrollRef}
+            tabIndex={0}
+            onKeyDown={handleNavKeyDown}
+            onFocusCapture={handleNavFocus}
+            aria-label="Menu de navegação"
+          >
+            <ul>
+              {menuSections.map((section) => (
+                <li key={section.id}>
+                  <a
+                    href={`#${section.id}`}
+                    onClick={(e) => handleNavClick(e, section.id)}
+                  >
+                    {section.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {(canScrollLeft || canScrollRight) && (
+            <button
+              type="button"
+              className="nav-scroll-btn right"
+              onClick={() => scrollNav(1)}
+              aria-label="Scroll menu para a direita"
+              disabled={!canScrollRight}
+            >
+              ›
+            </button>
+          )}
         </nav>
       </div>
     </header>
