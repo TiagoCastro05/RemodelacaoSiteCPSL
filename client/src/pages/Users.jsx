@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import "../styles/Users.css";
 
 // Pagina de gestao de utilizadores (admin)
@@ -24,6 +26,7 @@ const Users = () => {
     key: "data_criacao",
     direction: "desc",
   });
+  const { confirm, dialogProps } = useConfirm();
 
   // Carregar utilizadores
   const fetchUsers = async () => {
@@ -174,9 +177,10 @@ const Users = () => {
 
   // Eliminar utilizador
   const deleteUser = async (userId) => {
-    if (!window.confirm("Tem certeza que deseja eliminar este utilizador?")) {
-      return;
-    }
+    const confirmed = await confirm(
+      "Tem certeza que deseja eliminar este utilizador?",
+    );
+    if (!confirmed) return;
 
     try {
       const response = await api.delete(`/users/${userId}`);
@@ -431,6 +435,8 @@ const Users = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 };

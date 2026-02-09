@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import "../styles/ProjectsManagement.css";
 import "../styles/TransparencyManagement.css";
 
@@ -29,6 +31,7 @@ const TransparencyManagement = () => {
   const [success, setSuccess] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
+  const { confirm, dialogProps } = useConfirm();
 
   useEffect(() => {
     fetchDocumentos();
@@ -122,7 +125,7 @@ const TransparencyManagement = () => {
 
   // Elimina documento
   const handleDelete = async (id) => {
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       "Tem certeza que deseja eliminar este documento?",
     );
     if (!confirmed) return;
@@ -371,6 +374,8 @@ const TransparencyManagement = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 };
