@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { AuthContext } from "../contexts/AuthContext";
 import api from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import "../styles/Dashboard.css";
 
 // Pagina de gestao de secoes personalizadas
@@ -17,6 +19,7 @@ function CustomSectionsManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterLayout, setFilterLayout] = useState("todos");
   const [filterForm, setFilterForm] = useState("todos");
+  const { confirm, dialogProps } = useConfirm();
   const FORM_TYPES = [
     { id: "contacto", label: "Formulário de contacto" },
     { id: "erpi", label: "Inscrição ERPI" },
@@ -64,41 +67,6 @@ function CustomSectionsManagement() {
       return null;
     }
   };
-
-  // Confirmacao com toast antes de operacoes destrutivas
-  const confirmAction = (message) =>
-    new Promise((resolve) => {
-      toast(
-        (t) => (
-          <div className="toast-confirm">
-            <p>{message}</p>
-            <div className="toast-confirm-actions">
-              <button
-                type="button"
-                className="btn-cancel"
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  resolve(false);
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn-save"
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  resolve(true);
-                }}
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        ),
-        { duration: Infinity },
-      );
-    });
 
   // Validar user e carregar secoes
   useEffect(() => {
@@ -279,7 +247,7 @@ function CustomSectionsManagement() {
 
   // Elimina secao (soft delete no backend)
   const handleDelete = async (id) => {
-    const confirmed = await confirmAction(
+    const confirmed = await confirm(
       "Tem certeza que deseja eliminar esta seção?",
     );
     if (!confirmed) return;
@@ -1028,6 +996,8 @@ function CustomSectionsManagement() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

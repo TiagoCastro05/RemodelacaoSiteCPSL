@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import "../styles/ProjectsManagement.css";
 
 // Pagina de gestao de projetos
@@ -24,6 +26,7 @@ const ProjectsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
   const [sortOrder, setSortOrder] = useState("recentes");
+  const { confirm, dialogProps } = useConfirm();
 
   useEffect(() => {
     fetchProjects();
@@ -100,9 +103,10 @@ const ProjectsManagement = () => {
 
   // Elimina projeto
   const handleDelete = async (id) => {
-    if (!window.confirm("Tem certeza que deseja eliminar este projeto?")) {
-      return;
-    }
+    const confirmed = await confirm(
+      "Tem certeza que deseja eliminar este projeto?",
+    );
+    if (!confirmed) return;
 
     try {
       await api.delete(`/projetos/${id}`);
@@ -500,6 +504,8 @@ const ProjectsManagement = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 };

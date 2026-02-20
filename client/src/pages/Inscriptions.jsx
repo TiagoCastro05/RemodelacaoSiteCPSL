@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import "../styles/Inscriptions.css";
 
 // Pagina de gestao de inscricoes por servico
@@ -36,6 +38,7 @@ const Inscriptions = () => {
     key: "data",
     direction: "desc",
   });
+  const { confirm, dialogProps } = useConfirm();
 
   // Dispara evento global com contagem de nao lidas
   const dispatchUnread = (list) => {
@@ -124,7 +127,8 @@ const Inscriptions = () => {
 
   // Elimina inscricao e atualiza contadores
   const handleDelete = async (id) => {
-    if (!window.confirm("Eliminar esta inscrição?")) return;
+    const confirmed = await confirm("Eliminar esta inscrição?");
+    if (!confirmed) return;
     try {
       await api.delete(`${FORM_ENDPOINTS[selectedType]}/${id}`);
       const updated = (itemsByType[selectedType] || []).filter(
@@ -677,6 +681,8 @@ const Inscriptions = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 };

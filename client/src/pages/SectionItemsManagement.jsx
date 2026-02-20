@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import RichTextEditor from "../components/RichTextEditor";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import api from "../services/api";
 import "../styles/Dashboard.css";
 
@@ -43,6 +45,7 @@ function SectionItemsManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [imageWarning, setImageWarning] = useState("");
+  const { confirm, dialogProps } = useConfirm();
   const [formData, setFormData] = useState({
     titulo: "",
     subtitulo: "",
@@ -173,9 +176,10 @@ function SectionItemsManagement() {
 
   // Elimina item
   const handleDelete = async (itemId) => {
-    if (!window.confirm("Tem certeza que deseja eliminar este item?")) {
-      return;
-    }
+    const confirmed = await confirm(
+      "Tem certeza que deseja eliminar este item?",
+    );
+    if (!confirmed) return;
     try {
       await api.delete(`/secoes-personalizadas/${secaoId}/itens/${itemId}`);
       alert("Item eliminado com sucesso!");
@@ -423,6 +427,8 @@ function SectionItemsManagement() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

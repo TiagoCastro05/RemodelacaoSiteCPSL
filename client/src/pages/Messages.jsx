@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import useConfirm from "../hooks/useConfirm";
 import "../styles/Messages.css";
 
 // Pagina de gestao de mensagens do formulario
@@ -15,6 +17,7 @@ const Messages = () => {
     key: "data",
     direction: "desc",
   });
+  const { confirm, dialogProps } = useConfirm();
 
   // Carrega mensagens da API (com dedupe local)
   const fetchMensagens = async () => {
@@ -111,8 +114,10 @@ const Messages = () => {
 
   // Elimina mensagem selecionada
   const handleDelete = async (id) => {
-    if (!window.confirm("Tem certeza que deseja eliminar esta mensagem?"))
-      return;
+    const confirmed = await confirm(
+      "Tem certeza que deseja eliminar esta mensagem?",
+    );
+    if (!confirmed) return;
     try {
       await api.delete(`/mensagens/${id}`);
       // remove locally immediately so UI updates without full refresh
@@ -364,6 +369,8 @@ const Messages = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 };
